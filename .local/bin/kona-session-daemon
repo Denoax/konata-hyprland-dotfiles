@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+enabled_file="$state_root/session-restore-enabled"
+mkdir -p "$state_root"
+touch "$enabled_file"
+
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-session-daemon.lock"
+flock -n 9 || exit 0
+
+trap '"$HOME/.local/bin/kona-session-save" --quiet || true; exit 0' TERM INT EXIT
+while sleep 30; do
+  "$HOME/.local/bin/kona-session-save" --quiet || true
+done

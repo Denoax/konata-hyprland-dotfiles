@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pin_file="${XDG_CACHE_HOME:-$HOME/.cache}/nwg-dock-pinned"
+mkdir -p "$(dirname "$pin_file")"
+touch "$pin_file"
+if ! grep -qxF 'kona-search' "$pin_file"; then
+  printf '%s\n' 'kona-search' >> "$pin_file"
+fi
+
+exec "$HOME/.local/bin/nwg-dock-hyprland-kona" \
+  -d \
+  -p bottom \
+  -i 36 \
+  -mb 6 \
+  -hd 0 \
+  -w 10 \
+  -lp start \
+  -ico /usr/share/icons/Papirus/64x64/apps/distributor-logo-archlinux.svg \
+  -c "nwg-drawer -c 7 -is 52 -spacing 16 -nofs -ovl -wm uwsm -term kitty -i Papirus"

@@ -1,0 +1,103 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 32,
+  "spacing": 5,
+  "margin-top": 6,
+  "margin-left": 8,
+  "margin-right": 8,
+  "reload_style_on_change": true,
+  "modules-left": ["custom/kona", "hyprland/workspaces", "hyprland/window"],
+  "modules-center": ["clock"],
+  "modules-right": ["tray", "network", "pulseaudio", "cpu", "memory", "custom/gpu", "custom/notifications"],
+  "custom/kona": {
+    "format": "",
+    "tooltip": "Applications",
+    "on-click": "rofi -show drun -theme ~/.config/rofi/konata.rasi"
+  },
+  "hyprland/workspaces": {
+    "active-only": false,
+    "all-outputs": false,
+    "disable-scroll": true,
+    "sort-by-number": true,
+    "persistent-workspaces": {
+      "HDMI-A-1": [1, 4, 7],
+      "DP-4": [2, 5, 8, 10],
+      "HDMI-A-5": [3, 6, 9]
+    },
+    "format": "{name}",
+    "on-click": "activate"
+  },
+  "hyprland/window": {
+    "format": "{title}",
+    "max-length": 42,
+    "separate-outputs": true,
+    "rewrite": {
+      "": "KONATA@ARCH"
+    }
+  },
+  "clock": {
+    "interval": 1,
+    "format": "{:%H:%M:%S}",
+    "format-alt": "{:%A // %B %d // week %V}",
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#65dcff'><b>{}</b></span>",
+        "days": "<span color='#b8d9e8'>{}</span>",
+        "weeks": "<span color='#207cdf'>W{}</span>",
+        "weekdays": "<span color='#00c8ff'><b>{}</b></span>",
+        "today": "<span color='#071522' background='#65dcff'><b>{}</b></span>"
+      }
+    }
+  },
+  "tray": {
+    "icon-size": 15,
+    "spacing": 8
+  },
+  "network": {
+    "format-wifi": "  {essid}",
+    "format-ethernet": "󰈀  {ipaddr}",
+    "format-linked": "󰈀  linked",
+    "format-disconnected": "󰖪  offline",
+    "tooltip-format": "{ifname}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
+    "on-click": "nm-connection-editor"
+  },
+  "pulseaudio": {
+    "scroll-step": 5,
+    "format": "{icon}  {volume}%",
+    "format-muted": "󰝟  muted",
+    "format-icons": {
+      "headphone": "",
+      "default": ["", "", ""]
+    },
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "pavucontrol"
+  },
+  "cpu": {
+    "interval": 3,
+    "format": "  {usage}%",
+    "tooltip": true
+  },
+  "memory": {
+    "interval": 3,
+    "format": "  {percentage}%",
+    "tooltip-format": "RAM {used:0.1f} / {total:0.1f} GiB"
+  },
+  "custom/gpu": {
+    "exec": "~/.local/bin/kona-gpu-status",
+    "return-type": "json",
+    "interval": 5,
+    "tooltip": true
+  },
+  "custom/notifications": {
+    "exec": "swaync-client -swb",
+    "return-type": "json",
+    "escape": true,
+    "on-click": "swaync-client -t -sw",
+    "on-click-right": "swaync-client -d -sw"
+  }
+}

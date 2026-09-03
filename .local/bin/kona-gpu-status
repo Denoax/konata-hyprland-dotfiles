@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+row=$(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null | head -n 1)
+
+if [[ -z "$row" ]]; then
+  jq -cn '{text:"󰢮  n/a",tooltip:"NVIDIA GPU unavailable",class:"offline"}'
+  exit 0
+fi
+
+IFS=',' read -r util temp used total <<<"$row"
+util=${util//[[:space:]]/}
+temp=${temp//[[:space:]]/}
+used=${used//[[:space:]]/}
+total=${total//[[:space:]]/}
+
+jq -cn \
+  --arg text "󰢮  ${util}%  ${temp}°" \
+  --arg tooltip "RTX 4070\nGPU ${util}% // ${temp}°C\nVRAM ${used} / ${total} MiB" \
+  '{text:$text,tooltip:$tooltip,class:"online"}'

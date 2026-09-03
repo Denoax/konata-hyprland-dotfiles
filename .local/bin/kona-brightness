@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+state_file="$state_root/display-brightness"
+client="$HOME/.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-client"
+mkdir -p "$state_root"
+
+if [[ -s "$state_file" ]]; then
+  level="$(cat "$state_file")"
+else
+  hour="$(date +%H)"
+  if (( 10#$hour >= 23 || 10#$hour < 7 )); then level=90; else level=100; fi
+fi
+
+case "${1:-}" in
+  up) level=$((level + 5)) ;;
+  down) level=$((level - 5)) ;;
+  *) printf 'usage: %s {up|down}\n' "$0" >&2; exit 2 ;;
+esac
+(( level < 40 )) && level=40
+(( level > 120 )) && level=120
+printf '%s\n' "$level" > "$state_file"
+hyprctl hyprsunset gamma "$level" >/dev/null
+
+progress="$(awk -v level="$level" 'BEGIN { printf "%.3f", level / 120 }')"
+"$client" \
+  --custom-message 'Display brightness' \
+  --custom-icon display-brightness-symbolic \
+  --custom-progress "$progress" \
+  --custom-progress-text "$level%"
+

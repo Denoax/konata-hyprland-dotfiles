@@ -1,0 +1,116 @@
+:root {
+  --cc-bg: rgba(5, 20, 36, 0.94);
+  --noti-border-color: rgba(0, 200, 255, 0.40);
+  --noti-bg: 8, 29, 50;
+  --noti-bg-alpha: 0.92;
+  --noti-bg-darker: rgb(6, 19, 34);
+  --noti-bg-hover: rgb(13, 51, 83);
+  --noti-bg-focus: rgba(18, 98, 154, 0.42);
+  --noti-close-bg: rgba(0, 200, 255, 0.12);
+  --noti-close-bg-hover: rgba(0, 200, 255, 0.30);
+  --text-color: rgb(217, 247, 255);
+  --text-color-disabled: rgb(89, 135, 158);
+  --bg-selected: rgb(0, 200, 255);
+  --notification-icon-size: 52px;
+  --notification-app-icon-size: 18px;
+  --notification-group-icon-size: 28px;
+  --border: 1px solid var(--noti-border-color);
+  --border-radius: 8px;
+  --notification-shadow: 0 0 18px rgba(0, 174, 230, 0.14);
+  --font-size-body: 13px;
+  --font-size-summary: 14px;
+}
+
+* {
+  font-family: "JetBrainsMono Nerd Font";
+}
+
+notificationwindow,
+blankwindow {
+  background: transparent;
+}
+
+.control-center {
+  background: var(--cc-bg);
+  border: 1px solid var(--noti-border-color);
+  border-radius: 8px;
+  box-shadow: 0 0 24px rgba(0, 174, 230, 0.18);
+  padding: 8px;
+}
+
+.notification-row {
+  outline: none;
+  background: transparent;
+}
+
+.notification-row .notification-background {
+  padding: 5px 7px;
+}
+
+.notification-row .notification-background .notification {
+  background: rgba(var(--noti-bg), var(--noti-bg-alpha));
+  border: var(--border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--notification-shadow);
+}
+
+.notification-row .notification-background .notification.critical {
+  border-color: #ff7891;
+}
+
+.notification-row .notification-background .notification .notification-default-action {
+  color: var(--text-color);
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 5px;
+}
+
+.notification-row .notification-background .notification .notification-default-action:hover {
+  background: var(--noti-bg-hover);
+}
+
+.close-button {
+  color: var(--text-color);
+  background: var(--noti-close-bg);
+  border: none;
+  border-radius: 100%;
+  box-shadow: none;
+  min-width: 22px;
+  min-height: 22px;
+  margin: 7px;
+  padding: 0;
+}
+
+.close-button:hover {
+  background: var(--noti-close-bg-hover);
+}
+
+.widget-title,
+.widget-dnd,
+.widget-volume,
+.widget-buttons-grid,
+.widget-mpris {
+  color: var(--text-color);
+  background: rgba(11, 44, 74, 0.76);
+  border: 1px solid rgba(0, 200, 255, 0.20);
+  border-radius: 6px;
+  margin: 5px;
+  padding: 9px;
+}
+
+.widget-title > button,
+.widget-dnd > switch,
+.widget-buttons-grid > flowbox > flowboxchild > button {
+  color: #65dcff;
+  background: rgba(0, 200, 255, 0.08);
+  border: 1px solid rgba(0, 200, 255, 0.24);
+  border-radius: 5px;
+  box-shadow: none;
+}
+
+.widget-title > button:hover,
+.widget-buttons-grid > flowbox > flowboxchild > button:hover {
+  color: #061322;
+  background: #00c8ff;
+}

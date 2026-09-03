@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+runtime_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-overview"
+theme="$HOME/.config/rofi/konata.rasi"
+fallback_icon='/usr/share/icons/Papirus/64x64/apps/distributor-logo-archlinux.svg'
+mkdir -p "$runtime_root"
+
+clients="$(hyprctl clients -j)"
+monitors="$(hyprctl monitors -j)"
+declare -A thumbnails
+
+while IFS=$'\t' read -r output workspace; do
+  image="$runtime_root/workspace-$workspace.png"
+  timeout 3 grim -o "$output" "$image" >/dev/null 2>&1 || true
+  [[ -s "$image" ]] && thumbnails[$workspace]="$image"
+done < <(jq -r '.[] | [.name, (.activeWorkspace.id|tostring)] | @tsv' <<< "$monitors")
+
+menu="$runtime_root/menu"
+: > "$menu"
+for workspace in {1..10}; do
+  count="$(jq --argjson workspace "$workspace" '[.[] | select(.mapped == true and .workspace.id == $workspace)] | length' <<< "$clients")"
+  icon="${thumbnails[$workspace]:-$fallback_icon}"
+  printf 'WORKSPACE %s  //  %s APP%s\0icon\x1f%s\n' \
+    "$workspace" "$count" "$([[ "$count" == 1 ]] || printf S)" "$icon" >> "$menu"
+done
+
+choice="$(rofi -dmenu -i -show-icons -p 'WORKSPACE OVERVIEW // KONA' \
+  -theme "$theme" \
+  -theme-str 'window { width: 1080px; } listview { columns: 3; lines: 4; spacing: 10px; } element { orientation: vertical; padding: 8px; } element-icon { size: 210px; } element-text { horizontal-align: 0.5; }' \
+  < "$menu")" || exit 0
+
+workspace="$(sed -n 's/^WORKSPACE \([0-9][0-9]*\).*/\1/p' <<< "$choice")"
+[[ -n "$workspace" ]] && hyprctl dispatch "hl.dsp.focus({ workspace = $workspace })" >/dev/null
+

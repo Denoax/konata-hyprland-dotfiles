@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+choice=$(printf '%s\n' 'LOCK' 'LOG OUT' 'REBOOT' 'SHUT DOWN' | rofi -dmenu -i -p 'SESSION // KONA' -theme ~/.config/rofi/konata.rasi) || exit 0
+
+case "$choice" in
+  LOCK)
+    hyprlock
+    ;;
+  'LOG OUT')
+    confirm=$(printf '%s\n' 'CANCEL' 'LOG OUT' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
+    [[ "$confirm" == 'LOG OUT' ]] && hyprctl dispatch 'hl.dsp.exit()'
+    ;;
+  REBOOT)
+    confirm=$(printf '%s\n' 'CANCEL' 'REBOOT' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
+    [[ "$confirm" == 'REBOOT' ]] && systemctl reboot
+    ;;
+  'SHUT DOWN')
+    confirm=$(printf '%s\n' 'CANCEL' 'SHUT DOWN' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
+    [[ "$confirm" == 'SHUT DOWN' ]] && systemctl poweroff
+    ;;
+esac

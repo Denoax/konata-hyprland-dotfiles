@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -u
+
+pattern='kitty .*--class KonaDashboard'
+
+if pgrep -f "$pattern" >/dev/null 2>&1; then
+  if [[ "${1:-}" == "--startup" ]]; then
+    exit 0
+  fi
+  pkill -TERM -f "$pattern"
+  exit 0
+fi
+
+launch() {
+  uwsm app -- "$@" >/dev/null 2>&1 &
+}
+
+launch kitty --class KonaDashboard --title 'Kona::Clock' ~/.local/bin/kona-clock
+sleep 0.35
+
+launch kitty --class KonaDashboard --title 'Kona::System' bash -lc 'fastfetch; printf "\n  command deck ready // konata@arch\n"; exec bash'
+sleep 0.35
+launch kitty --override font_size=9.5 --class KonaDashboard --title 'Kona::Monitor' btop
+sleep 0.35
+launch kitty --class KonaDashboard --title 'Kona::Matrix' cmatrix -b -C blue -u 7
+
+sleep 0.35
+hyprctl dispatch 'hl.dsp.focus({ workspace = 3 })' >/dev/null
+
+notify-send -a 'Kona Command Center' 'Dashboard online' 'SUPER+SHIFT+ENTER or SUPER+CTRL+D toggles the command deck'

@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""Compact Konata-themed Spotify deck for a Kitty dashboard tile."""
+
+from __future__ import annotations
+
+import hashlib
+import fcntl
+import os
+import re
+import select
+import shutil
+import signal
+import subprocess
+import struct
+import sys
+import tempfile
+import termios
+import threading
+import time
+import tty
+import urllib.error
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+
+
+CYAN = "\033[38;2;0;200;255m"
+ICE = "\033[38;2;217;247;255m"
+BLUE = "\033[38;2;101;169;255m"
+DIM = "\033[38;2;123;167;189m"
+MUTED = "\033[38;2;50;83;107m"
+RESET = "\033[0m"
+BLOCKS = " ▁▂▃▄▅▆▇█"
+MOUSE_RE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def run_player(args: list[str], player: str | None, timeout: float = 1.5) -> str:
+    command = ["playerctl"]
+    if player:
+        command.append(f"--player={player}")
+    command.extend(args)
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=timeout,
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def choose_player() -> str | None:
+    players = run_player(["-l"], None).splitlines()
+    for player in players:
+        if player.lower().startswith("spotify"):
+            return player
+    return players[0] if players else None
+
+
+def download_cover(url: str) -> Path | None:
+    if not url:
+        return None
+    if url.startswith("file://"):
+        path = Path(url[7:])
+        return path if path.is_file() else None
+    if not url.startswith(("https://", "http://")):
+        return None
+
+    cache_dir = Path.home() / ".cache" / "kona-media-deck"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    target = cache_dir / f"{hashlib.sha256(url.encode()).hexdigest()}.img"
+    if target.is_file() and target.stat().st_size:
+        return target
+
+    temporary = target.with_suffix(".part")
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "KonaMediaDeck/1.0"})
+        with urllib.request.urlopen(request, timeout=6) as response:
+            payload = response.read(10 * 1024 * 1024 + 1)
+        if not payload or len(payload) > 10 * 1024 * 1024:
+            return None
+        temporary.write_bytes(payload)
+        temporary.replace(target)
+        return target
+    except (OSError, urllib.error.URLError):
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+
+
+class Spectrum:
+    def __init__(self) -> None:
+        self.levels: list[int] = [0] * 32
+        self.process: subprocess.Popen[str] | None = None
+        self.config_path: str | None = None
+        self.thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        config = """[general]
+bars = 32
+framerate = 24
+autosens = 1
+sensitivity = 100
+
+[input]
+method = pipewire
+source = auto
+
+[output]
+method = raw
+raw_target = /dev/stdout
+data_format = ascii
+ascii_max_range = 8
+bar_delimiter = 59
+frame_delimiter = 10
+channels = mono
+
+[smoothing]
+noise_reduction = 77
+"""
+        handle = tempfile.NamedTemporaryFile("w", prefix="kona-cava-", suffix=".conf", delete=False)
+        handle.write(config)
+        handle.close()
+        self.config_path = handle.name
+        try:
+            self.process = subprocess.Popen(
+                ["cava", "-p", handle.name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
+            )
+        except OSError:
+            return
+        self.thread = threading.Thread(target=self._read, daemon=True)
+        self.thread.start()
+
+    def _read(self) -> None:
+        assert self.process and self.process.stdout
+        for line in self.process.stdout:
+            try:
+                values = [max(0, min(8, int(value))) for value in line.strip().split(";") if value]
+            except ValueError:
+                continue
+            if values:
+                self.levels = values
+
+    def stop(self) -> None:
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+        if self.config_path:
+            try:
+                os.unlink(self.config_path)
+            except OSError:
+                pass
+
+
+class MediaDeck:
+    def __init__(self) -> None:
+        self.player: str | None = None
+        self.artist = ""
+        self.title = ""
+        self.album = ""
+        self.art_url = ""
+        self.cover: Path | None = None
+        self.status = "Stopped"
+        self.position = 0.0
+        self.duration = 0.0
+        self.position_read_at = time.monotonic()
+        self.last_metadata_at = 0.0
+        self.last_art_key = ""
+        self.last_size = (0, 0)
+        self.buttons: list[tuple[int, int, int, str]] = []
+        self.spectrum = Spectrum()
+        self.running = True
+        self.old_termios: list | None = None
+        self.input_buffer = b""
+
+    @staticmethod
+    def write_at(row: int, col: int, value: str, width: int | None = None) -> None:
+        if width is not None:
+            output: list[str] = []
+            visible = 0
+            cursor = 0
+            for match in ANSI_RE.finditer(value):
+                chunk = value[cursor:match.start()]
+                room = width - visible
+                output.append(chunk[:room])
+                visible += min(len(chunk), room)
+                if visible >= width:
+                    break
+                output.append(match.group())
+                cursor = match.end()
+            else:
+                chunk = value[cursor:]
+                room = width - visible
+                output.append(chunk[:room])
+                visible += min(len(chunk), room)
+            value = "".join(output) + " " * max(0, width - visible)
+        sys.stdout.write(f"\033[{row};{col}H{value}{RESET}")
+
+    @staticmethod
+    def clean(value: str) -> str:
+        return " ".join(value.replace("\n", " ").replace("\r", " ").split())
+
+    @staticmethod
+    def clock(value: float) -> str:
+        seconds = max(0, int(value))
+        return f"{seconds // 60}:{seconds % 60:02d}"
+
+    def refresh_metadata(self) -> None:
+        self.player = choose_player()
+        if not self.player:
+            self.status = "Stopped"
+            self.title = "No media playing"
+            self.artist = "KONATA@ARCH"
+            self.album = ""
+            self.position = 0
+            self.duration = 0
+            return
+
+        separator = "\x1f"
+        metadata = run_player(
+            ["metadata", "--format", "{{artist}}\x1f{{title}}\x1f{{album}}\x1f{{mpris:artUrl}}\x1f{{mpris:length}}"],
+            self.player,
+        ).split(separator)
+        metadata += [""] * (5 - len(metadata))
+        artist, title, album, art_url, duration = metadata[:5]
+        self.artist = self.clean(artist) or "Unknown artist"
+        self.title = self.clean(title) or "Unknown track"
+        self.album = self.clean(album)
+        self.status = run_player(["status"], self.player) or "Stopped"
+        try:
+            self.position = float(run_player(["position"], self.player) or 0)
+        except ValueError:
+            self.position = 0
+        try:
+            self.duration = float(duration or 0) / 1_000_000
+        except ValueError:
+            self.duration = 0
+        self.position_read_at = time.monotonic()
+
+        if art_url != self.art_url:
+            self.art_url = art_url
+            self.cover = download_cover(art_url)
+            self.last_art_key = ""
+
+    def action(self, name: str) -> None:
+        if not self.player:
+            return
+        actions = {
+            "previous": ["previous"],
+            "toggle": ["play-pause"],
+            "next": ["next"],
+        }
+        if name in actions:
+            subprocess.Popen(
+                ["playerctl", f"--player={self.player}", *actions[name]],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            self.last_metadata_at = 0
+
+    def display_cover(self, cols: int, rows: int, left: int, top: int, width: int, height: int) -> None:
+        key = f"{self.cover}:{cols}:{rows}:{left}:{top}:{width}:{height}"
+        if key == self.last_art_key:
+            return
+        sys.stdout.write("\033_Ga=d,d=i,i=7303;\033\\")
+        sys.stdout.flush()
+        if self.cover:
+            try:
+                _, _, pixel_width, pixel_height = struct.unpack(
+                    "HHHH", fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, b"\0" * 8)
+                )
+            except OSError:
+                pixel_width, pixel_height = cols * 9, rows * 21
+            pixel_width = pixel_width or cols * 9
+            pixel_height = pixel_height or rows * 21
+            graphic = subprocess.run(
+                [
+                    "kitten", "icat", "--silent", "--stdin=no", "--transfer-mode=stream",
+                    f"--use-window-size={cols},{rows},{pixel_width},{pixel_height}",
+                    "--scale-up=yes", "--align=center", f"--place={width}x{height}@{left - 1}x{top - 1}",
+                    "--image-id=7303", str(self.cover),
+                ],
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            sys.stdout.buffer.write(graphic.stdout)
+            sys.stdout.buffer.flush()
+        self.last_art_key = key
+
+    def progress_bar(self, width: int, position: float) -> str:
+        width = max(8, width)
+        ratio = min(1.0, position / self.duration) if self.duration else 0
+        filled = min(width - 1, int(ratio * (width - 1)))
+        return "━" * filled + "●" + "─" * (width - filled - 1)
+
+    def spectrum_line(self, width: int) -> str:
+        levels = self.spectrum.levels
+        if not levels:
+            return " " * width
+        return "".join(BLOCKS[levels[int(i * len(levels) / width)]] for i in range(width))
+
+    def draw_placeholder(self, left: int, top: int, width: int, height: int) -> None:
+        inner = max(1, width - 2)
+        self.write_at(top, left, f"{MUTED}╭{'─' * inner}╮")
+        for row in range(top + 1, top + height - 1):
+            if row == top + height // 2:
+                label = "    SPOTIFY  "
+                middle = label.center(inner)
+            else:
+                middle = " " * inner
+            self.write_at(row, left, f"{MUTED}│{middle}│")
+        self.write_at(top + height - 1, left, f"{MUTED}╰{'─' * inner}╯")
+
+    def draw(self) -> None:
+        cols, rows = shutil.get_terminal_size((68, 19))
+        cols = max(40, cols)
+        rows = max(14, rows)
+        if (cols, rows) != self.last_size:
+            sys.stdout.write("\033[2J\033[H")
+            self.last_size = (cols, rows)
+            self.last_art_key = ""
+
+        now = datetime.now()
+        self.write_at(2, 3, f"{CYAN}{now:%H:%M:%S}{DIM}   KONA // MEDIA DECK", cols - 4)
+        self.write_at(3, 3, f"{DIM}{now:%A} // {now:%B %d} // {now:%Y}", cols - 4)
+
+        show_art = cols >= 58 and rows >= 14
+        art_left, art_top = 3, 5
+        art_width, art_height = (16, min(8, rows - 8)) if show_art else (0, 0)
+        info_col = art_left + art_width + 3 if show_art else 3
+        info_width = max(28, cols - info_col - 2)
+
+        if show_art:
+            self.display_cover(cols, rows, art_left, art_top, art_width, art_height)
+            if not self.cover:
+                self.draw_placeholder(art_left, art_top, art_width, art_height)
+
+        playing = self.status == "Playing"
+        position = self.position + (time.monotonic() - self.position_read_at if playing else 0)
+        position = min(position, self.duration) if self.duration else position
+        state = "PLAYING" if playing else ("PAUSED" if self.status == "Paused" else "IDLE")
+        self.write_at(5, info_col, f"{CYAN}  NOW {state}", info_width)
+        self.write_at(6, info_col, f"{ICE}{self.title}", info_width)
+        self.write_at(7, info_col, f"{BLUE}{self.artist}", info_width)
+        self.write_at(8, info_col, f"{DIM}{self.album}", info_width)
+
+        bar_width = max(10, min(info_width - 2, 30))
+        self.write_at(10, info_col, f"{CYAN}{self.progress_bar(bar_width, position)}", info_width)
+        timing = f"{self.clock(position)} / {self.clock(self.duration)}" if self.duration else self.clock(position)
+        self.write_at(11, info_col, f"{DIM}{timing}", info_width)
+
+        play_icon = "Ⅱ" if playing else "▶"
+        controls = [("[ ◀◀ ]", "previous"), (f"[ {play_icon:^2} ]", "toggle"), ("[ ▶▶ ]", "next")]
+        control_text = " ".join(label for label, _ in controls)
+        self.write_at(12, info_col, f"{CYAN}{control_text}", info_width)
+        self.buttons = []
+        x = info_col
+        for label, action in controls:
+            self.buttons.append((12, x, x + len(label) - 1, action))
+            x += len(label) + 1
+
+        spectrum_row = min(rows - 2, max(14, art_top + art_height + 1))
+        spectrum_width = max(16, cols - 18)
+        self.write_at(spectrum_row, 3, f"{CYAN}LIVE AUDIO {DIM}// {BLUE}{self.spectrum_line(spectrum_width)}", cols - 4)
+        self.write_at(rows, 3, f"{MUTED}click controls  •  B previous  •  SPACE play/pause  •  N next  •  Q close", cols - 4)
+        sys.stdout.flush()
+
+    def handle_input(self) -> None:
+        if not select.select([sys.stdin], [], [], 0)[0]:
+            return
+        try:
+            self.input_buffer += os.read(sys.stdin.fileno(), 256)
+        except OSError:
+            return
+
+        for match in MOUSE_RE.finditer(self.input_buffer):
+            button, x, y, phase = match.groups()
+            if button == b"0" and phase == b"M":
+                mouse_x, mouse_y = int(x), int(y)
+                for row, start, end, action in self.buttons:
+                    if mouse_y == row and start <= mouse_x <= end:
+                        self.action(action)
+                        break
+
+        plain = MOUSE_RE.sub(b"", self.input_buffer)
+        for key in plain:
+            if key in (ord("q"), ord("Q")):
+                self.running = False
+            elif key in (ord(" "), ord("p"), ord("P")):
+                self.action("toggle")
+            elif key in (ord("n"), ord("N")):
+                self.action("next")
+            elif key in (ord("b"), ord("B")):
+                self.action("previous")
+        self.input_buffer = b""
+
+    def cleanup(self) -> None:
+        self.spectrum.stop()
+        sys.stdout.write("\033[?1000l\033[?1006l\033[0m\033[2J\033[H")
+        sys.stdout.flush()
+        sys.stdout.write("\033_Ga=d,d=i,i=7303;\033\\")
+        sys.stdout.flush()
+        if self.old_termios is not None:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.old_termios)
+
+    def run(self) -> None:
+        signal.signal(signal.SIGTERM, lambda *_: setattr(self, "running", False))
+        signal.signal(signal.SIGINT, lambda *_: setattr(self, "running", False))
+        if sys.stdin.isatty():
+            self.old_termios = termios.tcgetattr(sys.stdin.fileno())
+            tty.setcbreak(sys.stdin.fileno())
+        sys.stdout.write("\033]0;Kona::Clock\007\033[?25l\033[?1000h\033[?1006h\033[2J\033[H")
+        sys.stdout.flush()
+        self.spectrum.start()
+        try:
+            while self.running:
+                now = time.monotonic()
+                if now - self.last_metadata_at >= 0.8:
+                    self.refresh_metadata()
+                    self.last_metadata_at = now
+                self.draw()
+                self.handle_input()
+                time.sleep(0.04)
+        finally:
+            sys.stdout.write("\033[?25h")
+            self.cleanup()
+
+
+if __name__ == "__main__":
+    MediaDeck().run()

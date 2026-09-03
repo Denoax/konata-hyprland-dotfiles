@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wall_root="/home/mani/.local/share/wallpapers/konata-command-center"
+state_root="${XDG_STATE_HOME:-/home/mani/.local/state}"
+state_file="$state_root/kona-wallpaper-mode"
+
+start_daemon() {
+  if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+    uwsm app -- awww-daemon --no-cache --quiet >/dev/null 2>&1 &
+  fi
+
+  for _ in {1..50}; do
+    awww query >/dev/null 2>&1 && return 0
+    sleep 0.1
+  done
+  notify-send -u critical 'Wallpaper error' 'The animated wallpaper daemon did not start.'
+  return 1
+}
+
+apply_mode() {
+  local mode="$1"
+  local extension directory
+  local -a outputs
+
+  case "$mode" in
+    simple)
+      directory="$wall_root/v2"
+      extension="png"
+      ;;
+    animated)
+      directory="$wall_root/animated"
+      extension="webp"
+      ;;
+    static)
+      directory="$wall_root"
+      extension="png"
+      ;;
+    *)
+      printf 'usage: %s {simple|animated|static|toggle|restore|status}\n' "$0" >&2
+      return 2
+      ;;
+  esac
+
+  pkill -x hyprpaper >/dev/null 2>&1 || true
+  start_daemon
+  mapfile -t outputs < <(hyprctl monitors -j | jq -r 'sort_by(.x)[] | .name')
+
+  if (( ${#outputs[@]} < 3 )); then
+    notify-send -u critical 'Wallpaper error' 'Three active monitors were not detected.'
+    return 1
+  fi
+
+  if [[ "$mode" == "simple" ]]; then
+    awww img "$directory/selected.png" --resize crop --transition-type fade --transition-duration 0.6 --transition-fps 60
+  else
+    awww img --outputs "${outputs[0]}" "$directory/left.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
+    awww img --outputs "${outputs[1]}" "$directory/center.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
+    awww img --outputs "${outputs[2]}" "$directory/right.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
+  fi
+
+  install -d "$state_root"
+  printf '%s\n' "$mode" > "$state_file"
+}
+
+mode="${1:-toggle}"
+case "$mode" in
+  toggle)
+    current="$(cat "$state_file" 2>/dev/null || printf 'animated')"
+    [[ "$current" == "animated" ]] && apply_mode static || apply_mode animated
+    ;;
+  restore)
+    apply_mode "$(cat "$state_file" 2>/dev/null || printf 'animated')"
+    ;;
+  status)
+    cat "$state_file" 2>/dev/null || printf 'animated\n'
+    ;;
+  simple|animated|static)
+    apply_mode "$mode"
+    notify-send 'Wallpaper' "${mode^} background enabled"
+    ;;
+  *)
+    printf 'usage: %s {simple|animated|static|toggle|restore|status}\n' "$0" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Search Apps
+Comment=Search all installed applications
+Icon=preferences-system-search
+Exec=nwg-drawer -c 7 -is 52 -spacing 16 -nofs -ovl -wm uwsm -term kitty -i Papirus
+Terminal=false
+NoDisplay=true
+Categories=Utility;

@@ -1,0 +1,37 @@
+window {
+  background: transparent;
+}
+
+#osd {
+  background: rgba(4, 18, 38, 0.94);
+  border: 1px solid #00c8ff;
+  border-radius: 12px;
+  color: #d9f7ff;
+  padding: 10px 14px;
+  box-shadow: 0 8px 28px rgba(0, 174, 230, 0.35);
+}
+
+#osd image {
+  color: #6edcff;
+}
+
+#osd label {
+  color: #d9f7ff;
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#osd progressbar trough {
+  background: rgba(22, 72, 109, 0.8);
+  border-radius: 999px;
+  min-height: 8px;
+  min-width: 180px;
+}
+
+#osd progressbar progress {
+  background: linear-gradient(90deg, #00c8ff, #78ddff);
+  border-radius: 999px;
+  min-height: 8px;
+}
+

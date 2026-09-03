@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme="$HOME/.config/rofi/konata.rasi"
+default_sink="$(pactl get-default-sink)"
+default_source="$(pactl get-default-source)"
+records="$(mktemp)"
+trap 'rm -f "$records"' EXIT
+
+printf 'action\tvolume-down\t  Volume down\n' >> "$records"
+printf 'action\tvolume-up\t  Volume up\n' >> "$records"
+printf 'action\tmute\t󰝟  Toggle output mute\n' >> "$records"
+printf 'action\tmic-mute\t󰍭  Toggle microphone mute\n' >> "$records"
+
+pactl -f json list sinks | jq -r --arg current "$default_sink" '.[] | ["sink", .name, ((if .name == $current then "● " else "  " end) + "OUTPUT // " + (.description // .name))] | @tsv' >> "$records"
+pactl -f json list sources | jq -r --arg current "$default_source" '.[] | select(.monitor_source != true) | ["source", .name, ((if .name == $current then "● " else "  " end) + "INPUT  // " + (.description // .name))] | @tsv' >> "$records"
+
+choice="$(cut -f3- "$records" | rofi -dmenu -i -p 'AUDIO // KONA' -theme "$theme")" || exit 0
+[[ -n "$choice" ]] || exit 0
+record="$(awk -F '\t' -v chosen="$choice" '$3 == chosen {print; exit}' "$records")"
+kind="$(cut -f1 <<< "$record")"
+value="$(cut -f2 <<< "$record")"
+
+case "$kind:$value" in
+  action:volume-down) "$HOME/.local/bin/kona-osd" volume-down ;;
+  action:volume-up) "$HOME/.local/bin/kona-osd" volume-up ;;
+  action:mute) "$HOME/.local/bin/kona-osd" volume-mute ;;
+  action:mic-mute) "$HOME/.local/bin/kona-osd" mic-mute ;;
+  sink:*)
+    pactl set-default-sink "$value"
+    while read -r stream; do pactl move-sink-input "$stream" "$value" || true; done < <(pactl -f json list sink-inputs | jq -r '.[].index')
+    "$HOME/.local/bin/kona-osd" message "Output changed" audio-speakers-symbolic
+    ;;
+  source:*)
+    pactl set-default-source "$value"
+    while read -r stream; do pactl move-source-output "$stream" "$value" || true; done < <(pactl -f json list source-outputs | jq -r '.[].index')
+    "$HOME/.local/bin/kona-osd" message "Microphone changed" audio-input-microphone-symbolic
+    ;;
+esac
+

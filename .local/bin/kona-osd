@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+client="$HOME/.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-client"
+
+if [[ ! -x "$client" ]]; then
+  notify-send -u critical 'Kona OSD' 'swayosd is missing. Run kona-install-deps.'
+  exit 1
+fi
+
+case "${1:-}" in
+  volume-up) "$client" --output-volume raise --max-volume 100 ;;
+  volume-down) "$client" --output-volume lower --max-volume 100 ;;
+  volume-mute) "$client" --output-volume mute-toggle --max-volume 100 ;;
+  mic-mute) "$client" --input-volume mute-toggle ;;
+  brightness-up) "$client" --brightness raise --min-brightness 2 ;;
+  brightness-down) "$client" --brightness lower --min-brightness 2 ;;
+  play-pause) "$client" --playerctl play-pause --player auto ;;
+  next) "$client" --playerctl next --player auto ;;
+  previous) "$client" --playerctl prev --player auto ;;
+  caps-lock) "$client" --caps-lock ;;
+  num-lock) "$client" --num-lock ;;
+  message)
+    shift
+    "$client" --custom-message "${1:-Kona}" --custom-icon "${2:-dialog-information-symbolic}"
+    ;;
+  *)
+    printf 'usage: %s {volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down|play-pause|next|previous|caps-lock|num-lock|message}\n' "$0" >&2
+    exit 2
+    ;;
+esac
+

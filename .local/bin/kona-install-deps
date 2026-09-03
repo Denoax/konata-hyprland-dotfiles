@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+packages=(swayosd satty wf-recorder hyprsunset)
+cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/kona-user-packages"
+install_root="$HOME/.local/opt/kona-pkgs"
+mkdir -p "$cache_root" "$install_root"
+
+for package in "${packages[@]}"; do
+  url="$(pacman -Sp --print-format '%l' "$package" 2>/dev/null | tail -n1)"
+  if [[ -z "$url" ]]; then
+    printf 'Could not resolve the Arch package URL for %s. Try: sudo pacman -Sy %s\n' "$package" "$package" >&2
+    exit 1
+  fi
+  archive="$cache_root/$package.pkg.tar.zst"
+  printf 'Downloading %s...\n' "$package"
+  curl --fail --location --retry 3 --output "$archive" "$url"
+  rm -rf "$install_root/$package"
+  mkdir -p "$install_root/$package"
+  bsdtar -xf "$archive" -C "$install_root/$package"
+done
+
+printf 'Kona user-local dependencies installed in %s\n' "$install_root"
+

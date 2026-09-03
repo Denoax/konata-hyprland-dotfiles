@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+enabled_file="$state_root/session-restore-enabled"
+mkdir -p "$state_root"
+
+if [[ -f "$enabled_file" ]]; then
+  rm -f "$enabled_file"
+  notify-send -a 'Kona Session' 'Automatic restore disabled' 'Manual save and restore shortcuts still work.'
+else
+  touch "$enabled_file"
+  "$HOME/.local/bin/kona-session-save" --quiet
+  notify-send -a 'Kona Session' 'Automatic restore enabled' 'Supported apps will reopen at the next login.'
+fi
+

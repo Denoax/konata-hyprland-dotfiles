@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+runtime_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state_file="$runtime_root/kona-show-desktop.json"
+
+move_window() {
+  local address="$1"
+  local workspace="$2"
+  hyprctl dispatch "hl.dsp.window.move({ workspace = \"$workspace\", window = \"address:$address\" })" >/dev/null
+}
+
+if [[ -s "$state_file" ]]; then
+  while IFS=$'\t' read -r address workspace; do
+    move_window "$address" "$workspace" || true
+  done < <(jq -r '.[] | [.address, (.workspace | tostring)] | @tsv' "$state_file")
+  rm -f "$state_file"
+  exit 0
+fi
+
+visible_workspaces="$(hyprctl monitors -j | jq '[.[].activeWorkspace.id]')"
+windows="$(hyprctl clients -j | jq --argjson visible "$visible_workspaces" '[.[] | select(.mapped == true and .hidden == false) | select(.workspace.id as $id | $visible | index($id)) | {address, workspace: .workspace.id}]')"
+
+[[ "$(jq 'length' <<< "$windows")" -eq 0 ]] && exit 0
+printf '%s\n' "$windows" > "$state_file"
+
+while IFS= read -r address; do
+  move_window "$address" 'special:minimized'
+done < <(jq -r '.[].address' <<< "$windows")

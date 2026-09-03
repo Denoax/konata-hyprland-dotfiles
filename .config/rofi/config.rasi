@@ -1,0 +1,15 @@
+configuration {
+  modi: "drun,run,window";
+  show-icons: true;
+  icon-theme: "Papirus-Dark";
+  terminal: "kitty";
+  drun-display-format: "{name}";
+  display-drun: "APPS";
+  display-run: "RUN";
+  display-window: "WINDOWS";
+  matching: "fuzzy";
+  sort: true;
+  hover-select: true;
+  me-select-entry: "MousePrimary";
+  me-accept-entry: "MouseDPrimary";
+}

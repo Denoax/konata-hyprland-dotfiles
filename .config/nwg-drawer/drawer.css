@@ -1,0 +1,46 @@
+window {
+  background-color: rgba(5, 20, 36, 0.96);
+  color: #d9f7ff;
+}
+
+entry {
+  min-height: 42px;
+  margin: 14px;
+  padding: 0 14px;
+  color: #d9f7ff;
+  background-color: rgba(12, 41, 68, 0.92);
+  border: 1px solid rgba(0, 200, 255, 0.42);
+  border-radius: 10px;
+}
+
+button,
+image {
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+button {
+  color: #d9f7ff;
+  border-radius: 10px;
+}
+
+button:hover,
+button:focus {
+  background-color: rgba(0, 200, 255, 0.16);
+}
+
+#category-button {
+  margin: 0 8px;
+}
+
+#pinned-box {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 200, 255, 0.28);
+}
+
+#math-label {
+  color: #00c8ff;
+  font-size: 16px;
+  font-weight: bold;
+}

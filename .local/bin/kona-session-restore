@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+session_file="$state_root/session.json"
+enabled_file="$state_root/session-restore-enabled"
+
+if [[ "${1:-}" == "--startup" && ! -f "$enabled_file" ]]; then
+  exit 0
+fi
+[[ -s "$session_file" ]] || exit 0
+
+restored=0
+while IFS=$'\t' read -r class workspace command_json; do
+  if hyprctl clients -j | jq -e --arg class "$class" 'any(.[]; (.class | ascii_downcase) == ($class | ascii_downcase))' >/dev/null; then
+    continue
+  fi
+
+  mapfile -t command < <(jq -r '.[]' <<< "$command_json")
+  uwsm app -- "${command[@]}" >/dev/null 2>&1 &
+  address=''
+  for _ in {1..80}; do
+    address="$(hyprctl clients -j | jq -r --arg class "$class" '.[] | select((.class | ascii_downcase) == ($class | ascii_downcase)) | .address' | tail -n1)"
+    [[ -n "$address" ]] && break
+    sleep 0.1
+  done
+  if [[ -n "$address" ]]; then
+    hyprctl dispatch "hl.dsp.window.move({ workspace = $workspace, follow = false, window = \"address:$address\" })" >/dev/null || true
+    restored=$((restored + 1))
+  fi
+done < <(jq -r '.[] | [.class, (.workspace|tostring), (.command|tojson)] | @tsv' "$session_file")
+
+if [[ "${1:-}" != "--startup" ]]; then
+  notify-send -a 'Kona Session' 'Session restored' "$restored apps reopened."
+fi
+

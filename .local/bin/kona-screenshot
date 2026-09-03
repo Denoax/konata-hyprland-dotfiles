@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+target="$HOME/Pictures/Screenshots"
+mkdir -p "$target"
+file="$target/konata-$(date +%Y%m%d-%H%M%S).png"
+
+mode="${1:-full}"
+case "$mode" in
+  region|region-edit)
+    geometry=$(slurp) || exit 0
+    grim -g "$geometry" "$file"
+    ;;
+  full|full-edit)
+    grim "$file"
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+
+if [[ "$mode" == *-edit ]]; then
+  satty="$HOME/.local/opt/kona-pkgs/satty/usr/bin/satty"
+  if [[ -x "$satty" ]]; then
+    exec "$satty" \
+      --filename "$file" \
+      --output-filename "$file" \
+      --fullscreen current-screen \
+      --copy-command wl-copy \
+      --actions-on-enter save-to-clipboard \
+      --actions-on-right-click save-to-clipboard \
+      --early-exit all \
+      --notification-thumbnail screenshot \
+      --no-window-decoration \
+      --title 'Kona Screenshot Editor' \
+      --app-id io.kona.Satty
+  fi
+fi
+
+wl-copy < "$file"
+notify-send -a 'Kona Capture' 'Screenshot saved' "$file"

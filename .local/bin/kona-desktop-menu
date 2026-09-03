@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" != "--force" ]]; then
+  cursor="$(hyprctl cursorpos -j)"
+  cursor_x="$(jq -r '.x' <<< "$cursor")"
+  cursor_y="$(jq -r '.y' <<< "$cursor")"
+
+  # Keep Waybar and application context menus untouched.
+  (( cursor_y < 46 )) && exit 0
+  visible="$(hyprctl monitors -j | jq '[.[].activeWorkspace.id]')"
+  if hyprctl clients -j | jq -e --argjson x "$cursor_x" --argjson y "$cursor_y" --argjson visible "$visible" '
+    any(.[];
+      .mapped == true and .hidden == false and
+      (.workspace.id as $id | $visible | index($id)) != null and
+      $x >= .at[0] and $x < (.at[0] + .size[0]) and
+      $y >= .at[1] and $y < (.at[1] + .size[1])
+    )
+  ' >/dev/null; then
+    exit 0
+  fi
+fi
+
+choice="$({
+  printf '%s\n' \
+    'System Settings' \
+    'Display Settings' \
+    'Network Connections' \
+    'Sound Settings' \
+    'Audio Devices' \
+    'Mouse Settings' \
+    'Appearance' \
+    'Workspace Overview' \
+    'Night Light' \
+    'Backup Now' \
+    'Restore Wallpaper' \
+    'Files' \
+    'Terminal' \
+    'Lock PC' \
+    'Power / Session'
+} | rofi -dmenu -i -p 'Desktop' -theme ~/.config/rofi/konata.rasi)" || exit 0
+
+launch() {
+  uwsm app -- "$@" >/dev/null 2>&1 &
+}
+
+case "$choice" in
+  'System Settings') launch systemsettings ;;
+  'Display Settings') launch systemsettings kcm_kscreen ;;
+  'Network Connections') launch systemsettings kcm_networkmanagement ;;
+  'Sound Settings') launch systemsettings kcm_pulseaudio ;;
+  'Audio Devices') ~/.local/bin/kona-audio-menu ;;
+  'Mouse Settings') launch systemsettings kcm_mouse ;;
+  'Appearance') launch nwg-look ;;
+  'Workspace Overview') ~/.local/bin/kona-overview ;;
+  'Night Light') ~/.local/bin/kona-night-light toggle ;;
+  'Backup Now') ~/.local/bin/kona-backup ;;
+  'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;
+  'Files') launch xdg-open /home/mani ;;
+  'Terminal') launch kitty ;;
+  'Lock PC') launch hyprlock ;;
+  'Power / Session') ~/.local/bin/kona-session-menu ;;
+esac

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="${KONA_DOTFILES_ROOT:-$HOME/Desktop/chat/hypr-konata-dotfiles}"
+[[ -d "$repo_root" ]] || { printf 'Dotfiles repository not found: %s\n' "$repo_root" >&2; exit 1; }
+
+configs=(cava hypr kitty nwg-dock-hyprland nwg-drawer rofi swaync swayosd uwsm waybar xdg-desktop-portal)
+for config in "${configs[@]}"; do
+  [[ -d "$HOME/.config/$config" ]] || continue
+  mkdir -p "$repo_root/.config/$config"
+  rsync -a --delete "$HOME/.config/$config/" "$repo_root/.config/$config/"
+done
+rsync -a --delete --include='kona-*' --include='nwg-dock-hyprland-kona' --exclude='*' \
+  "$HOME/.local/bin/" "$repo_root/.local/bin/"
+mkdir -p "$repo_root/.local/share/applications" "$repo_root/.local/share/wallpapers"
+rsync -a "$HOME/.local/share/applications/kona-search.desktop" "$repo_root/.local/share/applications/"
+rsync -a "$HOME/.local/share/wallpapers/konata-command-center/" \
+  "$repo_root/.local/share/wallpapers/konata-command-center/"
+
+mkdir -p "$repo_root/packages"
+{ pacman -Qqen || true; } | sort > "$repo_root/packages/pacman.txt"
+{ pacman -Qqem || true; } | sort > "$repo_root/packages/aur.txt"
+{ flatpak list --app --columns=application || true; } | sort > "$repo_root/packages/flatpak.txt"
+{ systemctl --user list-unit-files --state=enabled --no-legend 2>/dev/null || true; } | awk '{print $1}' | sort > "$repo_root/packages/user-units.txt"
+
+git -C "$repo_root" add .
+if ! git -C "$repo_root" diff --cached --quiet; then
+  git -C "$repo_root" commit -m "Backup Konata desktop $(date +%Y-%m-%d)"
+fi
+
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  if ! git -C "$repo_root" remote get-url origin >/dev/null 2>&1; then
+    gh repo create konata-hyprland-dotfiles --private --source "$repo_root" --remote origin --push
+  else
+    git -C "$repo_root" push -u origin main
+  fi
+  notify-send -a 'Kona Backup' 'Backup complete' 'Local snapshot committed and pushed to the private GitHub repository.'
+else
+  notify-send -a 'Kona Backup' 'Local backup complete' 'GitHub login is required before the private copy can be pushed.'
+  printf 'Local backup complete. Run gh auth login, then run kona-backup again to push it.\n'
+fi

@@ -1,0 +1,121 @@
+@define-color ink #061322;
+@define-color panel rgba(7, 24, 42, 0.88);
+@define-color panel-soft rgba(10, 38, 65, 0.78);
+@define-color line rgba(0, 200, 255, 0.46);
+@define-color cyan #00c8ff;
+@define-color sky #65dcff;
+@define-color text #d9f7ff;
+@define-color muted #7ba7bd;
+@define-color green #56e39f;
+
+* {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  font-family: "JetBrainsMono Nerd Font";
+  font-size: 12px;
+  font-weight: 600;
+}
+
+window#waybar {
+  background: transparent;
+  color: @text;
+}
+
+window#waybar > box {
+  background: @panel;
+  border: 1px solid @line;
+  border-radius: 7px;
+  box-shadow: 0 0 18px rgba(0, 174, 230, 0.12);
+}
+
+tooltip {
+  background: rgba(5, 20, 36, 0.97);
+  border: 1px solid @line;
+  border-radius: 7px;
+}
+
+tooltip label {
+  color: @text;
+  padding: 8px;
+}
+
+#custom-kona {
+  color: @sky;
+  font-size: 22px;
+  font-weight: 700;
+  padding: 0 15px 0 13px;
+  border-right: 1px solid rgba(0, 200, 255, 0.22);
+}
+
+#workspaces {
+  padding: 3px 6px;
+}
+
+#workspaces button {
+  color: @muted;
+  background: transparent;
+  border-radius: 4px;
+  min-width: 24px;
+  padding: 2px 6px;
+  margin: 0 2px;
+}
+
+#workspaces button:hover {
+  color: @text;
+  background: rgba(0, 200, 255, 0.12);
+}
+
+#workspaces button.active {
+  color: @ink;
+  background: @cyan;
+  box-shadow: 0 0 10px rgba(0, 200, 255, 0.35);
+}
+
+#workspaces button.urgent {
+  color: @ink;
+  background: @green;
+}
+
+#window {
+  color: @muted;
+  padding: 0 12px;
+  font-style: italic;
+}
+
+#clock {
+  color: @sky;
+  background: @panel-soft;
+  border: 1px solid rgba(101, 220, 255, 0.24);
+  border-radius: 5px;
+  padding: 2px 16px;
+  letter-spacing: 2px;
+}
+
+#tray,
+#network,
+#pulseaudio,
+#cpu,
+#memory,
+#custom-gpu,
+#custom-notifications {
+  padding: 0 9px;
+}
+
+#network,
+#pulseaudio,
+#cpu,
+#memory,
+#custom-gpu {
+  color: #b8d9e8;
+}
+
+#custom-notifications {
+  color: @cyan;
+  padding-right: 13px;
+}
+
+#network.disconnected,
+#pulseaudio.muted {
+  color: #ff7891;
+}

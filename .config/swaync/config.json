@@ -1,0 +1,83 @@
+{
+  "$schema": "/etc/xdg/swaync/configSchema.json",
+  "ignore-gtk-theme": true,
+  "positionX": "right",
+  "positionY": "top",
+  "layer": "overlay",
+  "control-center-layer": "top",
+  "layer-shell": true,
+  "layer-shell-cover-screen": false,
+  "cssPriority": "user",
+  "control-center-margin-top": 46,
+  "control-center-margin-bottom": 10,
+  "control-center-margin-right": 10,
+  "control-center-margin-left": 10,
+  "notification-2fa-action": true,
+  "notification-inline-replies": true,
+  "notification-body-image-height": 120,
+  "notification-body-image-width": 220,
+  "timeout": 7,
+  "timeout-low": 4,
+  "timeout-critical": 0,
+  "fit-to-screen": true,
+  "relative-timestamps": true,
+  "control-center-width": 460,
+  "control-center-height": 780,
+  "notification-window-width": 430,
+  "keyboard-shortcuts": true,
+  "notification-grouping": true,
+  "image-visibility": "when-available",
+  "transition-time": 180,
+  "hide-on-clear": false,
+  "hide-on-action": true,
+  "text-empty": "All clear // time to game",
+  "script-fail-notify": true,
+  "widgets": ["title", "dnd", "mpris", "volume", "buttons-grid", "notifications"],
+  "widget-config": {
+    "notifications": {
+      "vexpand": true
+    },
+    "title": {
+      "text": "KONA // NOTIFICATIONS",
+      "clear-all-button": true,
+      "button-text": "CLEAR"
+    },
+    "dnd": {
+      "text": "DO NOT DISTURB"
+    },
+    "mpris": {
+      "blacklist": [],
+      "autohide": true,
+      "show-album-art": "always",
+      "loop-carousel": false
+    },
+    "volume": {
+      "label": "󰕾"
+    },
+    "buttons-grid": {
+      "buttons-per-row": 4,
+      "actions": [
+        {
+          "label": "󰤨  WIFI",
+          "type": "normal",
+          "command": "sh -c 'nmcli radio wifi | grep -q enabled && nmcli radio wifi off || nmcli radio wifi on'"
+        },
+        {
+          "label": "󰂯  BT",
+          "type": "normal",
+          "command": "blueman-manager"
+        },
+        {
+          "label": "󰍹  LOOK",
+          "type": "normal",
+          "command": "nwg-look"
+        },
+        {
+          "label": "󰌾  LOCK",
+          "type": "normal",
+          "command": "hyprlock"
+        }
+      ]
+    }
+  }
+}

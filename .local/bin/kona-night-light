@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+state_file="$state_root/night-light-manual"
+mkdir -p "$state_root"
+
+case "${1:-toggle}" in
+  toggle)
+    if [[ -f "$state_file" ]]; then
+      hyprctl hyprsunset identity >/dev/null
+      rm -f "$state_file"
+      "$HOME/.local/bin/kona-osd" message 'Night light: schedule' weather-clear-symbolic
+    else
+      hyprctl hyprsunset temperature 4000 >/dev/null
+      printf '4000\n' > "$state_file"
+      "$HOME/.local/bin/kona-osd" message 'Night light: warm' weather-clear-night-symbolic
+    fi
+    ;;
+  scheduled)
+    rm -f "$state_file"
+    hyprctl hyprsunset identity >/dev/null
+    "$HOME/.local/bin/kona-osd" message 'Night light: schedule' weather-clear-symbolic
+    ;;
+  *)
+    printf 'usage: %s {toggle|scheduled}\n' "$0" >&2
+    exit 2
+    ;;
+esac
+

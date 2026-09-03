@@ -1,0 +1,87 @@
+* {
+  bg: rgba(5, 20, 36, 94%);
+  bg-alt: rgba(11, 44, 74, 88%);
+  fg: #d9f7ff;
+  muted: #7ba7bd;
+  cyan: #00c8ff;
+  sky: #65dcff;
+  selected-fg: #061322;
+  background-color: transparent;
+  text-color: @fg;
+  font: "JetBrainsMono Nerd Font 12";
+}
+
+window {
+  width: 620px;
+  location: center;
+  anchor: center;
+  border: 1px;
+  border-color: @cyan;
+  border-radius: 8px;
+  background-color: @bg;
+  padding: 12px;
+}
+
+mainbox {
+  spacing: 10px;
+}
+
+inputbar {
+  background-color: @bg-alt;
+  border: 1px;
+  border-color: rgba(0, 200, 255, 35%);
+  border-radius: 5px;
+  padding: 10px 12px;
+  spacing: 10px;
+  children: [prompt, entry];
+}
+
+prompt {
+  text-color: @cyan;
+  padding: 0 8px 0 0;
+}
+
+entry {
+  placeholder: "search applications";
+  placeholder-color: @muted;
+}
+
+listview {
+  columns: 2;
+  lines: 7;
+  fixed-height: true;
+  cycle: true;
+  scrollbar: false;
+  spacing: 5px;
+}
+
+element {
+  orientation: horizontal;
+  border-radius: 5px;
+  padding: 8px;
+  spacing: 10px;
+}
+
+element normal.normal {
+  background-color: transparent;
+  text-color: @fg;
+}
+
+element selected.normal {
+  background-color: @cyan;
+  text-color: @selected-fg;
+}
+
+element-icon {
+  size: 24px;
+}
+
+element-text {
+  vertical-align: 0.5;
+}
+
+message {
+  background-color: @bg-alt;
+  border-radius: 5px;
+  padding: 10px;
+}

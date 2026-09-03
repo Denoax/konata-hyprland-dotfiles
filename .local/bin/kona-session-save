@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
+session_file="$state_root/session.json"
+temporary="$session_file.tmp"
+mkdir -p "$state_root"
+
+hyprctl clients -j | jq '
+  def command_for:
+    (.class | ascii_downcase) as $class |
+    if $class == "brave-browser" then ["flatpak", "run", "com.brave.Browser"]
+    elif $class == "code" then ["flatpak", "run", "com.visualstudio.code"]
+    elif $class == "spotify" then ["flatpak", "run", "com.spotify.Client"]
+    elif $class == "discord" then ["flatpak", "run", "com.discordapp.Discord"]
+    elif $class == "slack" then ["flatpak", "run", "com.slack.Slack"]
+    elif $class == "org.telegram.desktop" then ["flatpak", "run", "org.telegram.desktop"]
+    elif $class == "steam" then ["flatpak", "run", "com.valvesoftware.Steam"]
+    elif $class == "kitty" then ["kitty"]
+    else null end;
+  [ .[] |
+    select(.mapped == true and .initialClass != "KonaDashboard") |
+    (command_for) as $command |
+    select($command != null) |
+    {
+      class: .class,
+      command: $command,
+      workspace: (if .workspace.id > 0 then .workspace.id else 2 end)
+    }
+  ] |
+  unique_by(.class)
+' > "$temporary"
+
+mv "$temporary" "$session_file"
+if [[ "${1:-}" != "--quiet" ]]; then
+  count="$(jq 'length' "$session_file")"
+  notify-send -a 'Kona Session' 'Session saved' "$count restorable apps remembered."
+fi
+
