@@ -28,7 +28,8 @@ choice="$(printf '%s\n' \
   '  Bluetooth devices' \
   '  System settings' \
   '  Power and session' | \
-  rofi -dmenu -i -p 'QUICK SETTINGS // KONA' -theme "$theme")" || exit 0
+  rofi -dmenu -i -p 'QUICK SETTINGS // KONA' -theme "$theme" \
+    -theme-str 'window { width: 820px; } entry { placeholder: "filter controls"; }')" || exit 0
 
 case "$choice" in
   *'Audio devices'*) "$HOME/.local/bin/kona-audio-menu" ;;

@@ -1,0 +1,82 @@
+diff --git a/hypr.go b/hypr.go
+index 7345189..9a8b7bf 100644
+--- a/hypr.go
++++ b/hypr.go
+@@ -139,6 +139,25 @@ func dispatch(luaCmd string, legacyCmd string) {
+ }
+ 
+ func focusWindow(address string) {
++	for _, window := range clients {
++		if window.Address != address || window.Workspace.Name != "special:minimized" {
++			continue
++		}
++
++		var activeWorkspace workspace
++		reply, err := hyprctl("j/activeworkspace")
++		if err == nil && json.Unmarshal(reply, &activeWorkspace) == nil && activeWorkspace.Name != "" {
++			lua := fmt.Sprintf("dispatch hl.dsp.window.move({ workspace = '%s', follow = false, window = 'address:%s' })", activeWorkspace.Name, address)
++			legacy := fmt.Sprintf("dispatch movetoworkspacesilent %s,address:%s", activeWorkspace.Name, address)
++			dispatch(lua, legacy)
++			dispatch(
++				fmt.Sprintf("dispatch hl.dsp.window.clear_tags({ window = 'address:%s' })", address),
++				fmt.Sprintf("dispatch tagwindow -- -minimized,address:%s", address),
++			)
++		}
++		break
++	}
++
+ 	lua := fmt.Sprintf("dispatch hl.dsp.focus({ window = 'address:%s' })", address)
+ 	legacy := fmt.Sprintf("dispatch focuswindow address:%s ", address)
+ 	dispatch(lua, legacy)
+diff --git a/tools.go b/tools.go
+index a75a268..4911ef2 100644
+--- a/tools.go
++++ b/tools.go
+@@ -330,6 +330,22 @@ func clientMenu(class string, instances []client) gtk.Menu {
+ func clientMenuContext(class string, instances []client) gtk.Menu {
+ 	menu := gtk.NewMenu()
+ 
++	// Put the action people reach for most directly at the top level. The
++	// upstream menu only exposes a per-window close action inside a submenu.
++	closeLabel := "Close app"
++	if len(instances) > 1 {
++		closeLabel = "Close all windows"
++	}
++	closeApp := gtk.NewMenuItemWithLabel(closeLabel)
++	closeApp.Connect("activate", func() {
++		for _, instance := range instances {
++			closeWindow(instance.Address)
++		}
++	})
++	menu.Append(closeApp)
++	topSeparator := gtk.NewSeparatorMenuItem()
++	menu.Append(&topSeparator.MenuItem)
++
+ 	iconName, err := getIcon(class)
+ 	if err != nil {
+ 		log.Warnf("%s %s", err, class)
+@@ -353,7 +369,7 @@ func clientMenuContext(class string, instances []client) gtk.Menu {
+ 
+ 		a := instance.Address
+ 
+-		subitem := gtk.NewMenuItemWithLabel("closewindow")
++		subitem := gtk.NewMenuItemWithLabel("Close window")
+ 		submenu.Append(subitem)
+ 		subitem.Connect("activate", func() {
+ 			closeWindow(a)
+@@ -396,15 +412,6 @@ func clientMenuContext(class string, instances []client) gtk.Menu {
+ 	})
+ 	menu.Append(item)
+ 
+-	closeAllWindows := gtk.NewMenuItem()
+-	closeAllWindows.SetLabel("Close all windows")
+-	closeAllWindows.Connect("activate", func() {
+-		for _, instance := range instances {
+-			closeWindow(instance.Address)
+-		}
+-	})
+-	menu.Append(closeAllWindows)
+-
+ 	pinItem := gtk.NewMenuItem()
+ 	if !inPinned(class) {
+ 		pinItem.SetLabel("Pin")

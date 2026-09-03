@@ -2,6 +2,7 @@ com.brave.Browser
 com.discordapp.Discord
 com.github.finefindus.eyedropper
 com.github.phase1geo.minder
+com.github.wwmm.easyeffects
 com.slack.Slack
 com.spotify.Client
 com.valvesoftware.Steam

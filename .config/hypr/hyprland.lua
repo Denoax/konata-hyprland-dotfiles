@@ -1,5 +1,5 @@
 -- Konata Command Center
--- Hyprland 0.56+ Lua configuration for Mani's three-monitor Arch setup.
+-- Hyprland 0.56+ Lua configuration for a three-monitor Arch setup.
 
 local terminal = "kitty"
 local launcher = "rofi -show drun -theme ~/.config/rofi/konata.rasi"

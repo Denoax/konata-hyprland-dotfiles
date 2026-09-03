@@ -60,7 +60,7 @@ case "$choice" in
   'Night Light') ~/.local/bin/kona-night-light toggle ;;
   'Backup Now') ~/.local/bin/kona-backup ;;
   'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;
-  'Files') launch xdg-open /home/mani ;;
+  'Files') launch xdg-open "$HOME" ;;
   'Terminal') launch kitty ;;
   'Lock PC') launch hyprlock ;;
   'Power / Session') ~/.local/bin/kona-session-menu ;;

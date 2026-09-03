@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-wall_root="/home/mani/.local/share/wallpapers/konata-command-center"
-state_root="${XDG_STATE_HOME:-/home/mani/.local/state}"
+wall_root="$HOME/.local/share/wallpapers/konata-command-center"
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}"
 state_file="$state_root/kona-wallpaper-mode"
 
 start_daemon() {
