@@ -3,13 +3,24 @@ set -euo pipefail
 
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
 state_file="$state_root/night-light-manual"
+sunset="$HOME/.local/opt/kona-pkgs/hyprsunset/usr/bin/hyprsunset"
 mkdir -p "$state_root"
+
+restart_schedule() {
+  pkill -x hyprsunset >/dev/null 2>&1 || true
+  for _ in {1..20}; do
+    pgrep -x hyprsunset >/dev/null 2>&1 || break
+    sleep 0.05
+  done
+  sleep 0.3
+  uwsm app -- "$sunset" >/tmp/kona-hyprsunset.log 2>&1 &
+}
 
 case "${1:-toggle}" in
   toggle)
     if [[ -f "$state_file" ]]; then
-      hyprctl hyprsunset identity >/dev/null
       rm -f "$state_file"
+      restart_schedule
       "$HOME/.local/bin/kona-osd" message 'Night light: schedule' weather-clear-symbolic
     else
       hyprctl hyprsunset temperature 4000 >/dev/null
@@ -19,12 +30,15 @@ case "${1:-toggle}" in
     ;;
   scheduled)
     rm -f "$state_file"
-    hyprctl hyprsunset identity >/dev/null
+    restart_schedule
     "$HOME/.local/bin/kona-osd" message 'Night light: schedule' weather-clear-symbolic
     ;;
+  startup)
+    rm -f "$state_file"
+    exec "$sunset"
+    ;;
   *)
-    printf 'usage: %s {toggle|scheduled}\n' "$0" >&2
+    printf 'usage: %s {toggle|scheduled|startup}\n' "$0" >&2
     exit 2
     ;;
 esac
-
