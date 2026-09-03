@@ -20,6 +20,8 @@ rsync -a "$repo_root/.config/" "$HOME/.config/"
 if [[ -d "$repo_root/.local/share" ]]; then
   rsync -a "$repo_root/.local/share/" "$HOME/.local/share/"
 fi
+mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/kona"
+printf '%s\n' "$repo_root" > "${XDG_CONFIG_HOME:-$HOME/.config}/kona/backup-repo"
 
 "$HOME/.local/bin/kona-install-deps"
 

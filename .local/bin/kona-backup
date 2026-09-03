@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="${KONA_DOTFILES_ROOT:-$HOME/Desktop/chat/hypr-konata-dotfiles}"
+repo_hint="${XDG_CONFIG_HOME:-$HOME/.config}/kona/backup-repo"
+if [[ -n "${KONA_DOTFILES_ROOT:-}" ]]; then
+  repo_root="$KONA_DOTFILES_ROOT"
+elif [[ -s "$repo_hint" ]]; then
+  repo_root="$(cat "$repo_hint")"
+else
+  repo_root="$HOME/Desktop/chat/hypr-konata-dotfiles"
+fi
 [[ -d "$repo_root" ]] || { printf 'Dotfiles repository not found: %s\n' "$repo_root" >&2; exit 1; }
 
 configs=(cava hypr kitty nwg-dock-hyprland nwg-drawer rofi swaync swayosd uwsm waybar xdg-desktop-portal)
