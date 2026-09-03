@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme="$HOME/.config/rofi/konata.rasi"
+cache_count="$(find /var/cache/pacman/pkg -maxdepth 1 -type f -name '*.pkg.tar.*' 2>/dev/null | wc -l)"
+mapfile -t system_updates < <(pacman -Qu 2>/dev/null || true)
+mapfile -t flatpak_updates < <(timeout 20 flatpak remote-ls --updates --columns=application 2>/dev/null || true)
+
+if [[ "${1:-}" == "--check" ]]; then
+  printf 'arch_updates=%s flatpak_updates=%s cached_packages=%s\n' \
+    "${#system_updates[@]}" "${#flatpak_updates[@]}" "$cache_count"
+  exit 0
+fi
+
+choice="$(printf '%s\n' \
+  "󰏔  Install all updates  //  ${#system_updates[@]} Arch + ${#flatpak_updates[@]} Flatpak" \
+  "  Rollback information  //  $cache_count cached packages" \
+  '󰋼  Show pending packages' \
+  '󰑐  Recheck update status' | \
+  rofi -dmenu -i -p 'UPDATES // KONA' -theme "$theme")" || exit 0
+
+case "$choice" in
+  *'Install all updates'*)
+    confirm="$(printf '%s\n' 'Cancel' 'Update Arch and Flatpaks' | rofi -dmenu -p 'CONFIRM FULL UPDATE' -theme "$theme")" || exit 0
+    [[ "$confirm" == 'Update Arch and Flatpaks' ]] || exit 0
+    uwsm app -- kitty --class KonaUpdater --title 'Kona::Updates' bash -lc '
+      printf "KONA UPDATE DECK\\n\\n"
+      sudo pacman -Syu && flatpak update
+      status=$?
+      printf "\\nUpdate command finished with status %s.\\n" "$status"
+      printf "Pacman history: /var/log/pacman.log\\nCached rollback packages: /var/cache/pacman/pkg\\n"
+      read -rp "Press Enter to close..."
+      exit "$status"
+    ' >/dev/null 2>&1 &
+    ;;
+  *'Rollback information'*)
+    uwsm app -- kitty --class KonaUpdater --title 'Kona::Rollback' bash -lc '
+      printf "KONA ROLLBACK GUIDE\\n\\nRecent package operations:\\n"
+      grep -E "\\[ALPM\\] (upgraded|downgraded|installed|removed)" /var/log/pacman.log | tail -n 35
+      printf "\\nCached package files: %s\\n" "$(find /var/cache/pacman/pkg -maxdepth 1 -type f -name "*.pkg.tar.*" 2>/dev/null | wc -l)"
+      printf "\\nTo roll one package back:\\n  sudo pacman -U /var/cache/pacman/pkg/PACKAGE-OLD-VERSION.pkg.tar.zst\\n"
+      printf "\\nNever downgrade core system libraries blindly; use the log to identify the exact update first.\\n"
+      read -rp "Press Enter to close..."
+    ' >/dev/null 2>&1 &
+    ;;
+  *'Show pending packages'*)
+    report="$(mktemp)"
+    {
+      printf 'ARCH // %s\n' "${#system_updates[@]}"
+      printf '%s\n' "${system_updates[@]:-No pending Arch packages}"
+      printf '\nFLATPAK // %s\n' "${#flatpak_updates[@]}"
+      printf '%s\n' "${flatpak_updates[@]:-No pending Flatpaks}"
+    } > "$report"
+    rofi -dmenu -i -p 'PENDING UPDATES' -theme "$theme" < "$report" >/dev/null || true
+    rm -f "$report"
+    ;;
+  *'Recheck update status'*) exec "$0" ;;
+esac

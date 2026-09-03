@@ -25,7 +25,13 @@ hyprctl clients -j | jq '
     {
       class: .class,
       command: $command,
-      workspace: (if .workspace.id > 0 then .workspace.id else 2 end)
+      workspace: (if .workspace.id > 0 then .workspace.id else 2 end),
+      floating: .floating,
+      fullscreen: .fullscreen,
+      x: .at[0],
+      y: .at[1],
+      width: .size[0],
+      height: .size[1]
     }
   ] |
   unique_by(.class)
@@ -36,4 +42,3 @@ if [[ "${1:-}" != "--quiet" ]]; then
   count="$(jq 'length' "$session_file")"
   notify-send -a 'Kona Session' 'Session saved' "$count restorable apps remembered."
 fi
-

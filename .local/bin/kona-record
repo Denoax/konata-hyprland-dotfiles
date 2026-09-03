@@ -5,6 +5,7 @@ recorder="$HOME/.local/opt/kona-pkgs/wf-recorder/usr/bin/wf-recorder"
 state_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-record"
 pid_file="$state_root/pid"
 path_file="$state_root/path"
+start_file="$state_root/started"
 target="$HOME/Videos/Kona Captures"
 mkdir -p "$state_root" "$target"
 
@@ -19,7 +20,7 @@ stop_recording() {
       sleep 0.1
     done
   fi
-  rm -f "$pid_file" "$path_file"
+  rm -f "$pid_file" "$path_file" "$start_file"
   "$HOME/.local/bin/kona-osd" message 'Recording saved' media-record-symbolic || true
   [[ -n "$path" ]] && notify-send -a 'Kona Capture' 'Recording saved' "$path"
 }
@@ -49,15 +50,15 @@ esac
 
 file="$target/konata-record-$(date +%Y%m%d-%H%M%S).mp4"
 printf '%s\n' "$file" > "$path_file"
+date +%s > "$start_file"
 nohup "$recorder" -a --audio-backend=pipewire -c libx264 -p preset=veryfast -r 60 "${geometry[@]}" -f "$file" >"$state_root/log" 2>&1 &
 printf '%s\n' "$!" > "$pid_file"
 sleep 0.4
 if ! kill -0 "$(cat "$pid_file")" 2>/dev/null; then
   error="$(tail -n 3 "$state_root/log" 2>/dev/null || true)"
-  rm -f "$pid_file" "$path_file"
+  rm -f "$pid_file" "$path_file" "$start_file"
   notify-send -u critical 'Kona Capture' "Recording failed: $error"
   exit 1
 fi
 "$HOME/.local/bin/kona-osd" message 'Recording started' media-record-symbolic || true
 notify-send -a 'Kona Capture' 'Recording started' 'Press the same shortcut to stop and save.'
-

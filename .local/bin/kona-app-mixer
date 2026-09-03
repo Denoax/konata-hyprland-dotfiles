@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme="$HOME/.config/rofi/konata.rasi"
+records="$(mktemp)"
+trap 'rm -f "$records"' EXIT
+
+pactl -f json list sink-inputs | jq -r '
+  .[] |
+  (.properties["application.name"] // .properties["media.name"] // "Unknown app") as $name |
+  (.volume | to_entries[0].value.value_percent // "?") as $volume |
+  [(.index|tostring), $name,
+   ("" + (if .mute then "󰝟" else "" end) + "  " + $name + "  //  " + $volume)] |
+  @tsv
+' > "$records"
+
+if [[ ! -s "$records" ]]; then
+  notify-send -a 'Kona Audio' 'No app audio streams' 'Play something first, then reopen the mixer.'
+  exit 0
+fi
+
+if [[ "${1:-}" == "--check" ]]; then
+  printf 'audio_streams=%s\n' "$(wc -l < "$records")"
+  cut -f2 "$records"
+  exit 0
+fi
+
+choice="$(cut -f3- "$records" | rofi -dmenu -i -p 'APP MIXER // KONA' -theme "$theme")" || exit 0
+record="$(awk -F '\t' -v chosen="$choice" '$3 == chosen {print; exit}' "$records")"
+index="$(cut -f1 <<< "$record")"
+name="$(cut -f2 <<< "$record")"
+[[ -n "$index" ]] || exit 0
+
+action="$(printf '%s\n' 'Volume +5%' 'Volume -5%' 'Toggle mute' 'Set 100%' 'Set 50%' | \
+  rofi -dmenu -i -p "$name" -theme "$theme")" || exit 0
+case "$action" in
+  'Volume +5%') pactl set-sink-input-volume "$index" +5% ;;
+  'Volume -5%') pactl set-sink-input-volume "$index" -5% ;;
+  'Toggle mute') pactl set-sink-input-mute "$index" toggle ;;
+  'Set 100%') pactl set-sink-input-volume "$index" 100% ;;
+  'Set 50%') pactl set-sink-input-volume "$index" 50% ;;
+  *) exit 0 ;;
+esac
+"$HOME/.local/bin/kona-osd" message "$name audio updated" audio-volume-high-symbolic || true

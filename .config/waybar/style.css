@@ -98,6 +98,8 @@ tooltip label {
 #cpu,
 #memory,
 #custom-gpu,
+#custom-recording,
+#custom-gaming,
 #custom-notifications {
   padding: 0 9px;
 }
@@ -113,6 +115,28 @@ tooltip label {
 #custom-notifications {
   color: @cyan;
   padding-right: 13px;
+}
+
+#custom-recording.recording {
+  color: #ff5d78;
+  background: rgba(255, 46, 87, 0.14);
+  border: 1px solid rgba(255, 93, 120, 0.52);
+  border-radius: 5px;
+  padding: 0 9px;
+}
+
+#custom-recording.idle,
+#custom-gaming.inactive {
+  padding: 0;
+  margin: 0;
+}
+
+#custom-gaming.active {
+  color: #56e39f;
+  background: rgba(86, 227, 159, 0.12);
+  border: 1px solid rgba(86, 227, 159, 0.42);
+  border-radius: 5px;
+  padding: 0 9px;
 }
 
 #network.disconnected,

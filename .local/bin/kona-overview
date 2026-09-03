@@ -20,14 +20,16 @@ menu="$runtime_root/menu"
 : > "$menu"
 for workspace in {1..10}; do
   count="$(jq --argjson workspace "$workspace" '[.[] | select(.mapped == true and .workspace.id == $workspace)] | length' <<< "$clients")"
-  icon="${thumbnails[$workspace]:-$fallback_icon}"
+  history="$runtime_root/workspace-$workspace.png"
+  icon="${thumbnails[$workspace]:-${history}}"
+  [[ -s "$icon" ]] || icon="$fallback_icon"
   printf 'WORKSPACE %s  //  %s APP%s\0icon\x1f%s\n' \
     "$workspace" "$count" "$([[ "$count" == 1 ]] || printf S)" "$icon" >> "$menu"
 done
 
 if [[ "${1:-}" == "--check" ]]; then
   active_thumbnails="$(find "$runtime_root" -maxdepth 1 -type f -name 'workspace-*.png' -size +0c | wc -l)"
-  printf 'workspace_cards=10 active_thumbnails=%s\n' "$active_thumbnails"
+  printf 'workspace_cards=10 retained_thumbnails=%s\n' "$active_thumbnails"
   exit 0
 fi
 

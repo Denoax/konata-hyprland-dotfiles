@@ -31,6 +31,8 @@ choice="$({
     'Mouse Settings' \
     'Appearance' \
     'Workspace Overview' \
+    'Quick Settings' \
+    'Updates' \
     'Night Light' \
     'Backup Now' \
     'Restore Wallpaper' \
@@ -53,6 +55,8 @@ case "$choice" in
   'Mouse Settings') launch systemsettings kcm_mouse ;;
   'Appearance') launch nwg-look ;;
   'Workspace Overview') ~/.local/bin/kona-overview ;;
+  'Quick Settings') ~/.local/bin/kona-quick-settings ;;
+  'Updates') ~/.local/bin/kona-updates ;;
   'Night Light') ~/.local/bin/kona-night-light toggle ;;
   'Backup Now') ~/.local/bin/kona-backup ;;
   'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;

@@ -50,6 +50,10 @@ desktop starts clear for normal use; open the optional command dashboard with
 | `Super + Ctrl + Shift + R` | Start/stop active-monitor recording |
 | `Super + W` | Thumbnail workspace overview |
 | `Super + Shift + A` | Audio input/output picker |
+| `Super + Ctrl + A` | Per-app audio mixer |
+| `Super + C` | Unified quick settings |
+| `Super + G` | Toggle gaming mode |
+| `Super + U` | Updates and rollback dashboard |
 | `Super + Shift + N` | Toggle warm night light / schedule |
 | `Super + Ctrl + S` | Save the current app session |
 | `Super + Ctrl + Shift + S` | Restore the saved app session |
@@ -100,16 +104,23 @@ Arch button opens the full application drawer.
   blue Kona on-screen display.
 - The audio picker changes the default input/output and moves active audio
   streams to the selected device.
+- The per-app mixer controls each active Spotify, browser, Discord, or game
+  stream independently.
 - Night light follows a 07:00 clear, 20:00 soft, and 23:00 warm schedule. The
   shortcut temporarily toggles a warm manual mode.
 - Screenshots are stored in `~/Pictures/Screenshots`; edited captures open in
   Satty. Recordings are stored in `~/Videos/Kona Captures` and include audio.
-- `Super + W` shows live thumbnails for the three visible workspaces and clean
-  cards for the remaining workspace bank.
+- `Super + W` shows live thumbnails for visible workspaces and retained recent
+  thumbnails for inactive workspaces.
 - Brave, VS Code, Spotify, Discord, Slack, Telegram, Steam, and normal Kitty
   windows are saved every 30 seconds and restored to their workspaces at login.
+  Floating windows also remember their exact position and size.
 - PipeWire, WirePlumber, and the Hyprland ScreenCast portal are configured for
   browser, Discord, OBS, and Flatpak screen sharing.
+- Recording and gaming mode show persistent Waybar indicators. Gaming mode
+  disables compositor effects and enables VRR until toggled off.
+- The update dashboard reports Arch and Flatpak updates, requires confirmation
+  before upgrading, and shows the Pacman history/cache needed for rollback.
 
 ## Backup and restore
 

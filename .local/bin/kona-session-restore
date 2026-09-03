@@ -11,7 +11,7 @@ fi
 [[ -s "$session_file" ]] || exit 0
 
 restored=0
-while IFS=$'\t' read -r class workspace command_json; do
+while IFS=$'\t' read -r class workspace command_json floating fullscreen x y width height; do
   if hyprctl clients -j | jq -e --arg class "$class" 'any(.[]; (.class | ascii_downcase) == ($class | ascii_downcase))' >/dev/null; then
     continue
   fi
@@ -26,11 +26,23 @@ while IFS=$'\t' read -r class workspace command_json; do
   done
   if [[ -n "$address" ]]; then
     hyprctl dispatch "hl.dsp.window.move({ workspace = $workspace, follow = false, window = \"address:$address\" })" >/dev/null || true
+    if [[ "$floating" == "true" ]]; then
+      hyprctl dispatch "hl.dsp.window.float({ action = \"enable\", window = \"address:$address\" })" >/dev/null || true
+      hyprctl dispatch "hl.dsp.window.resize({ x = $width, y = $height, relative = false, window = \"address:$address\" })" >/dev/null || true
+      hyprctl dispatch "hl.dsp.window.move({ x = $x, y = $y, relative = false, window = \"address:$address\" })" >/dev/null || true
+    fi
+    if [[ "$fullscreen" != "0" ]]; then
+      hyprctl dispatch "hl.dsp.window.fullscreen({ action = \"set\", window = \"address:$address\" })" >/dev/null || true
+    fi
     restored=$((restored + 1))
   fi
-done < <(jq -r '.[] | [.class, (.workspace|tostring), (.command|tojson)] | @tsv' "$session_file")
+done < <(jq -r '.[] | [
+  .class, (.workspace|tostring), (.command|tojson),
+  ((.floating // false)|tostring), ((.fullscreen // 0)|tostring),
+  ((.x // 0)|tostring), ((.y // 0)|tostring),
+  ((.width // 900)|tostring), ((.height // 650)|tostring)
+] | @tsv' "$session_file")
 
 if [[ "${1:-}" != "--startup" ]]; then
   notify-send -a 'Kona Session' 'Session restored' "$restored apps reopened."
 fi
-

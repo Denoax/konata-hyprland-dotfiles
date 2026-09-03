@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-game-mode"
+
+enable_mode() {
+  hyprctl eval 'hl.config({
+    ["animations.enabled"] = false,
+    ["decoration.blur.enabled"] = false,
+    ["decoration.shadow.enabled"] = false,
+    ["general.allow_tearing"] = true,
+    ["misc.vrr"] = 1,
+  })' >/dev/null
+  touch "$state_file"
+  "$HOME/.local/bin/kona-osd" message 'Gaming mode enabled' applications-games-symbolic || true
+  notify-send -a 'Kona Gaming' 'Performance mode enabled' 'Animations and blur are off; VRR and tearing support are enabled.'
+}
+
+disable_mode() {
+  rm -f "$state_file"
+  hyprctl reload >/dev/null
+  "$HOME/.local/bin/kona-osd" message 'Gaming mode disabled' applications-games-symbolic || true
+  notify-send -a 'Kona Gaming' 'Desktop mode restored' 'Normal animations and visual effects are back.'
+}
+
+case "${1:-toggle}" in
+  toggle) [[ -f "$state_file" ]] && disable_mode || enable_mode ;;
+  on) enable_mode ;;
+  off) disable_mode ;;
+  status) [[ -f "$state_file" ]] && printf 'on\n' || printf 'off\n' ;;
+  waybar)
+    if [[ -f "$state_file" ]]; then
+      jq -cn '{text:"󰊴 GAME",tooltip:"Gaming mode is active\nClick to restore desktop effects",class:"active"}'
+    else
+      jq -cn '{text:"",tooltip:"Enable gaming mode",class:"inactive"}'
+    fi
+    ;;
+  *) printf 'usage: %s {toggle|on|off|status|waybar}\n' "$0" >&2; exit 2 ;;
+esac

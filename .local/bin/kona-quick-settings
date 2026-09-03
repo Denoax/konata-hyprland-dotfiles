@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme="$HOME/.config/rofi/konata.rasi"
+sink="$(pactl -f json list sinks | jq -r --arg name "$(pactl get-default-sink)" '.[] | select(.name == $name) | .description' | head -n1)"
+night='scheduled'
+[[ -f "${XDG_STATE_HOME:-$HOME/.local/state}/kona/night-light-manual" ]] && night='manual warm'
+game="$($HOME/.local/bin/kona-game-mode status)"
+record='idle'
+record_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-record"
+[[ -s "$record_root/pid" ]] && kill -0 "$(cat "$record_root/pid")" 2>/dev/null && record='RECORDING'
+
+if [[ "${1:-}" == "--check" ]]; then
+  printf 'sink=%s night_light=%s gaming=%s recording=%s\n' "${sink:-default}" "$night" "$game" "$record"
+  exit 0
+fi
+
+choice="$(printf '%s\n' \
+  "  Audio devices  //  ${sink:-default}" \
+  '󰕾  Per-app volume mixer' \
+  "󰖨  Night light  //  $night" \
+  "󰊴  Gaming mode  //  $game" \
+  "󰑋  Screen recording  //  $record" \
+  '󰍹  Workspace overview' \
+  '󰏔  Updates and rollback' \
+  '󰁯  Backup now' \
+  '  Network connections' \
+  '  Bluetooth devices' \
+  '  System settings' \
+  '  Power and session' | \
+  rofi -dmenu -i -p 'QUICK SETTINGS // KONA' -theme "$theme")" || exit 0
+
+case "$choice" in
+  *'Audio devices'*) "$HOME/.local/bin/kona-audio-menu" ;;
+  *'Per-app volume'*) "$HOME/.local/bin/kona-app-mixer" ;;
+  *'Night light'*) "$HOME/.local/bin/kona-night-light" toggle ;;
+  *'Gaming mode'*) "$HOME/.local/bin/kona-game-mode" toggle ;;
+  *'Screen recording'*) "$HOME/.local/bin/kona-record" output ;;
+  *'Workspace overview'*) "$HOME/.local/bin/kona-overview" ;;
+  *'Updates and rollback'*) "$HOME/.local/bin/kona-updates" ;;
+  *'Backup now'*) "$HOME/.local/bin/kona-backup" ;;
+  *'Network connections'*) uwsm app -- nm-connection-editor >/dev/null 2>&1 & ;;
+  *'Bluetooth devices'*) uwsm app -- blueman-manager >/dev/null 2>&1 & ;;
+  *'System settings'*) uwsm app -- systemsettings >/dev/null 2>&1 & ;;
+  *'Power and session'*) "$HOME/.local/bin/kona-session-menu" ;;
+esac

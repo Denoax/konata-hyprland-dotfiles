@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+runtime_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-overview"
+mkdir -p "$runtime_root"
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-workspace-history.lock"
+flock -n 9 || exit 0
+
+capture_visible() {
+  while IFS=$'\t' read -r output workspace; do
+    [[ "$workspace" =~ ^[0-9]+$ ]] || continue
+    temporary="$runtime_root/workspace-$workspace.new.png"
+    if timeout 4 grim -o "$output" "$temporary" >/dev/null 2>&1; then
+      mv "$temporary" "$runtime_root/workspace-$workspace.png"
+    else
+      rm -f "$temporary"
+    fi
+  done < <(hyprctl monitors -j | jq -r '.[] | [.name, (.activeWorkspace.id|tostring)] | @tsv')
+}
+
+while true; do
+  capture_visible
+  sleep 30
+done
+

@@ -9,11 +9,12 @@
   "reload_style_on_change": true,
   "modules-left": ["custom/kona", "hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
-  "modules-right": ["tray", "network", "pulseaudio", "cpu", "memory", "custom/gpu", "custom/notifications"],
+  "modules-right": ["custom/recording", "custom/gaming", "tray", "network", "pulseaudio", "cpu", "memory", "custom/gpu", "custom/notifications"],
   "custom/kona": {
     "format": "",
     "tooltip": "Applications",
-    "on-click": "rofi -show drun -theme ~/.config/rofi/konata.rasi"
+    "on-click": "rofi -show drun -theme ~/.config/rofi/konata.rasi",
+    "on-click-right": "~/.local/bin/kona-quick-settings"
   },
   "hyprland/workspaces": {
     "active-only": false,
@@ -57,6 +58,18 @@
   "tray": {
     "icon-size": 15,
     "spacing": 8
+  },
+  "custom/recording": {
+    "exec": "~/.local/bin/kona-record-status",
+    "return-type": "json",
+    "interval": 1,
+    "on-click": "~/.local/bin/kona-record output"
+  },
+  "custom/gaming": {
+    "exec": "~/.local/bin/kona-game-mode waybar",
+    "return-type": "json",
+    "interval": 2,
+    "on-click": "~/.local/bin/kona-game-mode toggle"
   },
   "network": {
     "format-wifi": "  {essid}",
