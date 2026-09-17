@@ -96,5 +96,10 @@ HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" \
   "$test_home/.local/bin/kona-theme" --default --no-reload >/dev/null
 [[ -s "$test_home/.config/kona/appearance/current.json" ]]
 
-HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" Hyprland --verify-config --config "$test_home/.config/hypr/hyprland.lua" >/dev/null
+if command -v Hyprland >/dev/null 2>&1; then
+  HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" \
+    Hyprland --verify-config --config "$test_home/.config/hypr/hyprland.lua" >/dev/null
+else
+  printf 'Hyprland config verification skipped: Hyprland is not installed on this host.\n' >&2
+fi
 printf 'Recovery smoke test passed in isolated home: %s\n' "$test_home"
