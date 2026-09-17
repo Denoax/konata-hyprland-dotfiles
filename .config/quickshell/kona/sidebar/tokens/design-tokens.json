@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "reference": {
+    "width": 1672,
+    "height": 941,
+    "coordinates": "see references/regions.json"
+  },
+  "color": {
+    "text": "#D6E3F8",
+    "muted": "#9CB2D2",
+    "subtle": "#6F87A7",
+    "accent": "#72A7FF",
+    "accentStrong": "#447ADC",
+    "panel": "#0A1423",
+    "surface": "#111F33",
+    "line": "#2D4668",
+    "active": "#1B3864",
+    "danger": "#EA8C9C",
+    "success": "#28C88B"
+  },
+  "metrics": {
+    "sidebarWidth": 300,
+    "railWidth": 60,
+    "sidebarMargin": 20,
+    "cardRadius": 12,
+    "panelRadius": 14,
+    "buttonRadius": 8,
+    "rowHeight": 38,
+    "hitTarget": 32,
+    "icon": 20,
+    "appIcon": 24,
+    "body": 14,
+    "caption": 11,
+    "header": 24,
+    "stroke": 1
+  },
+  "motion": {
+    "pressMs": 90,
+    "releaseMs": 140,
+    "accordionMs": 200,
+    "slideInMs": 220,
+    "slideOutMs": 180,
+    "pressScale": 0.96,
+    "easing": "OutCubic",
+    "reducedMotion": "zero spatial movement; optional 80ms opacity only"
+  },
+  "glow": {
+    "outerColor": "#5998ff",
+    "padding": 30,
+    "nineSlice": 48
+  },
+  "fonts": {
+    "ui": "Noto Sans",
+    "data": "JetBrains Mono",
+    "quote": "serif",
+    "files_bundled": false
+  }
+}

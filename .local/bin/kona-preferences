@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Single storage boundary for Kona UI preferences; narrow, guarded atomic updates."""
+import copy
+import fcntl
+import json
+import os
+from pathlib import Path
+import tempfile
+import sys
+HOME=Path.home()
+CONFIG=Path(os.environ.get('XDG_CONFIG_HOME',HOME/'.config'))/'kona'
+DEFAULTS={'motion':'full','intensity':1.0,'accent':'wallpaper','favorites':[],
+          'appearance':{'rounding':8,'opacity':.96,'inactive':.90,'blur':True}}
+def read(path,default):
+    try:return json.loads(path.read_text())
+    except FileNotFoundError:return default
+def preferences(value=None):
+    value=read(CONFIG/'preferences.json',{}) if value is None else value
+    if not isinstance(value,dict) or set(value)-set(DEFAULTS):raise ValueError('unknown preference field')
+    p=copy.deepcopy(DEFAULTS)|value
+    if p['motion'] not in ('full','reduced','off') or p['accent'] not in ('wallpaper','cyan'):
+        raise ValueError('invalid appearance/motion preference')
+    if type(p['intensity']) not in (int,float) or not .75<=p['intensity']<=1.25:raise ValueError('intensity must be 0.75–1.25')
+    if not isinstance(p['favorites'],list) or len(p['favorites'])>512 or any(not isinstance(x,str) for x in p['favorites']):raise ValueError('invalid favorites')
+    a=p['appearance']
+    if not isinstance(a,dict) or set(a)!={'rounding','opacity','inactive','blur'}:raise ValueError('invalid appearance')
+    if type(a['rounding']) is not int or not 6<=a['rounding']<=16 or type(a['blur']) is not bool:raise ValueError('invalid rounding/blur')
+    if any(type(a[k]) not in (float,int) or not .8<=a[k]<=1 for k in ('opacity','inactive')):raise ValueError('invalid opacity')
+    return p
+
+def update(changes, expected=None):
+    CONFIG.mkdir(parents=True,exist_ok=True)
+    with (CONFIG/'.preferences.lock').open('w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        current=preferences()
+        if expected and any(current[k]!=v for k,v in expected.items()):
+            raise RuntimeError('Preferences changed concurrently; refresh Studio and retry')
+        result=preferences(current|changes)
+        fd,name=tempfile.mkstemp(prefix='.preferences.',dir=CONFIG)
+        try:
+            with os.fdopen(fd,'w') as f:json.dump(result,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
+            os.replace(name,CONFIG/'preferences.json')
+        finally:Path(name).unlink(missing_ok=True)
+        return result
+if __name__=='__main__':
+    try:
+        if len(sys.argv)==1:print(json.dumps(preferences()))
+        elif len(sys.argv)==2:print(json.dumps(update(json.loads(sys.argv[1]))))
+        else:raise ValueError('usage: kona-preferences [JSON changes]')
+    except (OSError,ValueError,RuntimeError) as e:print(str(e),file=sys.stderr);sys.exit(1)

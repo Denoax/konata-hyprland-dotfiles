@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme="$HOME/.config/rofi/konata.rasi"
+theme="$HOME/.config/rofi/list.rasi"
 cache_count="$(find /var/cache/pacman/pkg -maxdepth 1 -type f -name '*.pkg.tar.*' 2>/dev/null | wc -l)"
 mapfile -t system_updates < <(pacman -Qu 2>/dev/null || true)
 mapfile -t flatpak_updates < <(timeout 20 flatpak remote-ls --updates --columns=application 2>/dev/null || true)

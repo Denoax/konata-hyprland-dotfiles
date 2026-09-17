@@ -17,6 +17,21 @@ for config in "${configs[@]}"; do
   mkdir -p "$repo_root/.config/$config"
   rsync -a --delete "$HOME/.config/$config/" "$repo_root/.config/$config/"
 done
+# Service recovery is limited to the explicit Kona manifest. Never import or
+# delete unrelated user services (which may also contain private credentials).
+while IFS= read -r unit; do
+  relative=".config/systemd/user/$unit"
+  [[ -f "$HOME/$relative" ]] || continue
+  mkdir -p "$repo_root/$(dirname "$relative")"
+  cp -a "$HOME/$relative" "$repo_root/$relative"
+done < "$repo_root/packages/kona-user-units.txt"
+# Theme source and shipped fallback belong in recovery; runtime generations do not.
+if [[ -d "$HOME/.config/kona/theme" ]]; then
+  mkdir -p "$repo_root/.config/kona/theme"
+  rsync -a --delete --exclude=current --exclude=generations --exclude='.lock' \
+    --exclude='reload-pending.json' "$HOME/.config/kona/theme/" "$repo_root/.config/kona/theme/"
+fi
+
 rsync -a --delete --include='kona-*' --include='nwg-dock-hyprland-kona' --exclude='*' \
   "$HOME/.local/bin/" "$repo_root/.local/bin/"
 mkdir -p "$repo_root/.local/share/applications" "$repo_root/.local/share/wallpapers"

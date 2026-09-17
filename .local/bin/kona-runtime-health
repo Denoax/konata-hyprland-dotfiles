@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Bounded session readiness and polkit-owner diagnostics for Kona."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+UNIT = "hyprpolkitagent.service"
+SESSION_KEYS = (
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "HYPRLAND_INSTANCE_SIGNATURE",
+    "XDG_CURRENT_DESKTOP",
+    "XDG_SESSION_TYPE",
+)
+
+
+def command(args: list[str], timeout: float = 3) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout, check=False)
+
+
+def manager_environment() -> dict[str, str]:
+    result = command(["systemctl", "--user", "show-environment"])
+    if result.returncode:
+        return {}
+    values: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = value
+    return values
+
+
+def session_environment() -> dict[str, str]:
+    manager = manager_environment()
+    return {key: manager.get(key, os.environ.get(key, "")) for key in SESSION_KEYS}
+
+
+def hyprland_instances() -> list[dict[str, object]]:
+    try:
+        result = command(["hyprctl", "instances", "-j"])
+        values = json.loads(result.stdout) if result.returncode == 0 else []
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return []
+    if not isinstance(values, list):
+        return []
+    live = []
+    for value in values:
+        try:
+            pid = int(value["pid"])
+            started = int(value["time"])
+            signature = str(value["instance"])
+            display = str(value["wl_socket"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if pid > 0 and (Path("/proc") / str(pid)).exists() and signature and display:
+            live.append({"pid": pid, "time": started, "instance": signature, "wl_socket": display})
+    return sorted(live, key=lambda value: (int(value["time"]), int(value["pid"])))
+
+
+def canonical_instance() -> dict[str, object] | None:
+    """The oldest live compositor owns the login session; nested instances do not."""
+    instances = hyprland_instances()
+    return instances[0] if instances else None
+
+
+def hyprland_readiness(environment: dict[str, str] | None = None) -> tuple[bool, list[str]]:
+    environment = environment or session_environment()
+    problems: list[str] = []
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    canonical = canonical_instance()
+    if canonical is None:
+        return False, ["no live Hyprland instance exists"]
+    display = str(canonical["wl_socket"])
+    signature = str(canonical["instance"])
+    if environment.get("WAYLAND_DISPLAY") != display:
+        problems.append("user-manager WAYLAND_DISPLAY does not identify the canonical compositor")
+    if environment.get("HYPRLAND_INSTANCE_SIGNATURE") != signature:
+        problems.append("user-manager HYPRLAND_INSTANCE_SIGNATURE does not identify the canonical compositor")
+    if not display:
+        problems.append("user manager has no WAYLAND_DISPLAY")
+    elif not (runtime / display).exists():
+        problems.append(f"Wayland socket is absent: {runtime / display}")
+    if not signature:
+        problems.append("user manager has no HYPRLAND_INSTANCE_SIGNATURE")
+    elif not (runtime / "hypr" / signature / ".socket.sock").exists():
+        problems.append("Hyprland IPC socket is absent for the declared instance")
+    if problems:
+        return False, problems
+    process_environment = os.environ.copy()
+    process_environment.update({
+        **{key: value for key, value in environment.items() if value},
+        "WAYLAND_DISPLAY": display,
+        "HYPRLAND_INSTANCE_SIGNATURE": signature,
+    })
+    try:
+        result = subprocess.run(
+            ["hyprctl", "-j", "monitors"], capture_output=True, text=True,
+            timeout=3, check=False, env=process_environment,
+        )
+        monitors = json.loads(result.stdout) if result.returncode == 0 else []
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        monitors = []
+    if not isinstance(monitors, list) or not monitors:
+        problems.append("Hyprland IPC is not responding for the declared instance")
+    return not problems, problems
+
+
+def unit_properties() -> dict[str, str]:
+    properties = ("LoadState", "ActiveState", "SubState", "Result", "MainPID", "NRestarts")
+    result = command([
+        "systemctl", "--user", "show", UNIT,
+        *[f"--property={name}" for name in properties],
+    ])
+    if result.returncode:
+        return {"LoadState": "error", "Error": result.stderr.strip() or result.stdout.strip()}
+    return dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+
+
+def process_environment(pid: int) -> dict[str, str]:
+    try:
+        fields = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")
+    except OSError:
+        return {}
+    values: dict[str, str] = {}
+    for field in fields:
+        if b"=" in field:
+            key, value = field.split(b"=", 1)
+            values[key.decode(errors="replace")] = value.decode(errors="replace")
+    return values
+
+
+def agent_processes() -> list[dict[str, object]]:
+    processes: list[dict[str, object]] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            executable = Path(os.readlink(entry / "exe")).name
+        except OSError:
+            continue
+        if executable != "hyprpolkitagent":
+            continue
+        pid = int(entry.name)
+        processes.append({"pid": pid, "environment": process_environment(pid)})
+    return sorted(processes, key=lambda value: int(value["pid"]))
+
+
+def evaluate_polkit(
+    unit: dict[str, str], processes: list[dict[str, object]],
+    expected_environment: dict[str, str], hyprland_ready: bool,
+) -> dict[str, object]:
+    problems: list[str] = []
+    try:
+        main_pid = int(unit.get("MainPID", "0"))
+    except ValueError:
+        main_pid = 0
+    pids = [int(process["pid"]) for process in processes]
+    if not hyprland_ready:
+        problems.append("Hyprland session is not ready")
+    if unit.get("ActiveState") != "active" or unit.get("SubState") != "running":
+        problems.append(f"{UNIT} is {unit.get('ActiveState', 'unknown')}/{unit.get('SubState', 'unknown')}")
+    if unit.get("Result") == "start-limit-hit":
+        problems.append(f"{UNIT} is start-limited")
+    if len(pids) != 1:
+        problems.append(f"expected one hyprpolkitagent process, found {len(pids)}")
+    if len(pids) == 1 and main_pid != pids[0]:
+        problems.append(f"systemd MainPID {main_pid} does not own live PID {pids[0]}")
+    if len(pids) == 1:
+        actual = processes[0].get("environment", {})
+        for key in ("WAYLAND_DISPLAY", "HYPRLAND_INSTANCE_SIGNATURE"):
+            expected = expected_environment.get(key, "")
+            if not expected or not isinstance(actual, dict) or actual.get(key) != expected:
+                problems.append(f"agent {key} does not match the current user-manager session")
+    return {
+        "ok": not problems,
+        "owner": "SYSTEMD OWNED",
+        "unit": unit,
+        "processes": pids,
+        "expected_environment": {
+            key: expected_environment.get(key, "")
+            for key in ("WAYLAND_DISPLAY", "HYPRLAND_INSTANCE_SIGNATURE")
+        },
+        "problems": problems,
+    }
+
+
+def wait_ready(timeout: float) -> tuple[bool, list[str]]:
+    deadline = time.monotonic() + timeout
+    problems: list[str] = []
+    while True:
+        ready, problems = hyprland_readiness()
+        if ready or time.monotonic() >= deadline:
+            return ready, problems
+        time.sleep(0.05)
+
+
+def is_canonical_invocation() -> tuple[bool, str]:
+    canonical = canonical_instance()
+    if canonical is None:
+        return False, "no live Hyprland instance exists"
+    current = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+    if current != canonical["instance"]:
+        return False, f"instance {current or '<unset>'} is not the canonical login compositor"
+    return True, ""
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("owner", "ready", "wait-ready", "polkit"), nargs="?", default="polkit")
+    parser.add_argument("--timeout", type=float, default=5)
+    arguments = parser.parse_args()
+    if arguments.command == "owner":
+        owns_session, problem = is_canonical_invocation()
+        if not owns_session:
+            print("kona-runtime-health: " + problem, file=sys.stderr)
+        return 0 if owns_session else 1
+    if arguments.command == "wait-ready":
+        ready, problems = wait_ready(max(0, min(arguments.timeout, 15)))
+    else:
+        ready, problems = hyprland_readiness()
+    if arguments.command in ("ready", "wait-ready"):
+        if not ready:
+            print("kona-runtime-health: " + "; ".join(problems), file=sys.stderr)
+        return 0 if ready else 1
+    environment = session_environment()
+    result = evaluate_polkit(unit_properties(), agent_processes(), environment, ready)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["ok"] else 1
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"kona-runtime-health: {error}", file=sys.stderr)
+        raise SystemExit(1)

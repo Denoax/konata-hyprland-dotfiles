@@ -1,0 +1,7 @@
+kona-clipboard@.service
+kona-automount.service
+kona-osd.service
+hypridle.service.d/50-kona.conf
+swaync.service.d/50-kona.conf
+hyprpolkitagent.service.d/50-kona.conf
+app-nm\x2dapplet@autostart.service.d/50-kona.conf

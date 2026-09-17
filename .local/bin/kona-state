@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Read-only schema-1 view of existing owners. No second writable state store.
+[[ $# == 0 || ( $# == 1 && "$1" == status ) ]] || {
+  printf 'usage: %s [status]\n' "$0" >&2; exit 2;
+}
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="${XDG_STATE_HOME:-$HOME/.local/state}"
+gaming=false
+[[ ! -f "$runtime/kona-game-mode" ]] || gaming=true
+recording="$("$HOME/.local/bin/kona-record-status")"
+wallpaper="$(cat "$state/kona-wallpaper-mode" 2>/dev/null || printf animated)"
+case "$wallpaper" in simple|static|animated) ;; *) wallpaper=animated ;; esac
+night=scheduled
+[[ ! -f "$state/kona/night-light-manual" ]] || night=manual
+policy="$("$HOME/.local/bin/kona-profile" status)"
+jq -cn --argjson policy "$policy" --argjson gaming "$gaming" --argjson recording "$recording" \
+  --arg wallpaper "$wallpaper" --arg night "$night" \
+  '{schema:1,profile:$policy.profile,return_to:$policy.return_to,scene:$policy.scene,gaming:{active:$gaming},recording:{active:($recording.class == "recording")},
+    wallpaper:{mode:$wallpaper},night_light:{mode:$night}}'

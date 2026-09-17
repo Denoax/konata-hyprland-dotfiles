@@ -1,0 +1,2 @@
+# Generated lockscreen frames are fixed-width art; trailing spaces preserve rows.
+.config/kona/lockscreen/mono-rain/frames/*.txt -whitespace

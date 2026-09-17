@@ -1,0 +1,8 @@
+@import "shared.rasi"
+
+window { width: 440px; height: 360px; }
+listview { lines: 4; scrollbar: false; }
+element { padding: 11px; }
+element-icon { enabled: true; size: 20px; }
+entry { placeholder: "Choose a profile…"; }
+textbox-help { content: "Enter  Apply profile     Esc  Keep current profile"; }

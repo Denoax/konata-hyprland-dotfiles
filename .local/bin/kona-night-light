@@ -13,7 +13,7 @@ restart_schedule() {
     sleep 0.05
   done
   sleep 0.3
-  uwsm app -- "$sunset" >/tmp/kona-hyprsunset.log 2>&1 &
+  uwsm app -s b -- "$sunset" >/tmp/kona-hyprsunset.log 2>&1 &
 }
 
 case "${1:-toggle}" in
@@ -35,6 +35,9 @@ case "${1:-toggle}" in
     ;;
   startup)
     rm -f "$state_file"
+    if uwsm check is-active hyprland.desktop; then
+      exec uwsm app -s b -- "$sunset"
+    fi
     exec "$sunset"
     ;;
   *)

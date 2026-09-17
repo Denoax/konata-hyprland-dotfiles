@@ -1,0 +1,8 @@
+@import "shared.rasi"
+
+window { width: 620px; }
+listview { lines: 9; }
+element-icon { enabled: false; }
+element { padding: 10px 11px; }
+entry { placeholder: "Filter recent clipboard text…"; }
+textbox-help { content: "Enter  Copy     Alt+D  Delete     Alt+C  Clear history     Esc  Cancel"; }

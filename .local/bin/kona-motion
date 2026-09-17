@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Translate shared motion intent to native Hyprland; never change profile policy."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'kona'
+
+def sync_swaync_motion(mode, profile):
+    """Translate the shared motion preference to SwayNC's only motion switch."""
+    path = ROOT.parent / 'swaync/config.json'
+    if not path.is_file():
+        return
+    data = json.loads(path.read_text())
+    reduced = mode in ('reduced', 'off') or profile in ('focus', 'gaming')
+    desired = 0 if reduced else 200
+    changed = data.get('transition-time') != desired
+    data['transition-time'] = desired
+    tools = data.get('widget-config', {}).get('menubar#system', {}).get('menu#tools')
+    if isinstance(tools, dict):
+        animation = 'none' if reduced else 'slide_down'
+        changed = changed or tools.get('animation-type') != animation or tools.get('animation-duration') != 190
+        tools['animation-type'] = animation
+        tools['animation-duration'] = 190
+    if not changed:
+        return
+    fd, temporary = tempfile.mkstemp(prefix='.config.', suffix='.json', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(data, stream, indent=2, ensure_ascii=False)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    subprocess.run(['swaync-client', '--reload-config', '--skip-wait'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+
+def expression(tokens, mode='full', profile='daily', intensity=1):
+    if mode not in ('full', 'reduced', 'off') or not .75 <= intensity <= 1.25:
+        raise ValueError('invalid motion preference')
+    restricted = profile in ('focus', 'gaming')
+    enabled = mode != 'off' and not restricted
+    factor = .35 if mode == 'reduced' else intensity
+    distance = 3 if mode == 'reduced' else tokens['workspace.distance']
+    spatial = tokens['spatial.hero' if profile == 'showcase' else 'spatial.default']
+    commands = ['hl.curve("konaSpatial", {type="spring",mass=1,stiffness=400,dampening=40})',
+                'hl.curve("konaEffect", {type="bezier",points={{0.22,1},{0.36,1}}})']
+    for leaf, duration, style, spring in [
+        ('global', spatial, '', True), ('windows', tokens['spatial.fast'], '', True),
+        ('windowsIn', tokens['spatial.fast'], 'popin 97%', True),
+        ('windowsOut', tokens['effect.default'], 'popin 98%', False),
+        ('fade', tokens['effect.fast'], '', False), ('layers', tokens['spatial.fast'], '', False),
+        ('workspaces', spatial, f'slidefade {distance}%', True)]:
+        commands.append('hl.animation({' + f'leaf="{leaf}",enabled={str(enabled).lower()},speed={duration*factor/100:.3f},' +
+                        ('spring="konaSpatial"' if spring else 'bezier="konaEffect"') +
+                        (',style=' + json.dumps(style) if style else '') + '})')
+    # No continuously rendered active-border loop, in any profile.
+    commands.append('hl.animation({leaf="borderangle",enabled=false})')
+    return ';'.join(commands)
+
+def main():
+    tokens = json.loads((ROOT / 'motion.json').read_text())
+    try: prefs = json.loads((ROOT / 'preferences.json').read_text())
+    except FileNotFoundError: prefs = {}
+    profile = sys.argv[1] if len(sys.argv)>1 else json.loads(subprocess.check_output([str(Path.home()/'.local/bin/kona-profile'),'status']))['profile']
+    mode = prefs.get('motion','full')
+    code = expression(tokens,mode,profile,prefs.get('intensity',1))
+    if '--print' in sys.argv: print(code); return
+    p = subprocess.run(['hyprctl','eval',code],capture_output=True,text=True,timeout=5)
+    if p.returncode or 'error' in p.stdout.lower():
+        raise RuntimeError(p.stderr or p.stdout)
+    sync_swaync_motion(mode, profile)
+
+if __name__=='__main__':
+    try: main()
+    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as e:
+        print(f'kona-motion: {e}',file=sys.stderr);sys.exit(1)

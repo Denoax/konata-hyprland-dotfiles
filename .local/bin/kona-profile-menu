@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+profile="$("$HOME/.local/bin/kona-profile" status | jq -r .profile)"
+icon="$HOME/.config/kona/menus/icons/profile.svg"
+menu="$(mktemp)"
+trap 'rm -f -- "$menu"' EXIT
+profiles=(daily focus gaming showcase)
+labels=('Daily · normal desktop' 'Focus · quiet effects and bar' 'Gaming · static, effects off' 'Showcase · full effects and selected scene')
+for index in "${!profiles[@]}"; do
+  marker='  '; [[ "${profiles[$index]}" != "$profile" ]] || marker='● '
+  printf '%s%s\0icon\x1f%s\n' "$marker" "${labels[$index]}" "$icon"
+done > "$menu"
+choice="$(rofi -dmenu -i -show-icons -no-custom -no-sort -format i \
+  -p "Profile · ${profile^}" -theme "$HOME/.config/rofi/profile.rasi" < "$menu")" || exit 0
+case "$choice" in
+  0) profile=daily ;; 1) profile=focus ;; 2) profile=gaming ;; 3) profile=showcase ;; *) exit 0 ;;
+esac
+"$HOME/.local/bin/kona-profile" set "$profile"
+"$HOME/.local/bin/kona-menu-sound"

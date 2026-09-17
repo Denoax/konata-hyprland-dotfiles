@@ -1,0 +1,23 @@
+{
+  "name": "Kona Frost",
+  "surface": "#F7FAFF",
+  "surface_alt": "#EEF4FC",
+  "surface_elevated": "#FFFFFF",
+  "surface_pressed": "#E3EDF9",
+  "text": "#263446",
+  "text_secondary": "#637289",
+  "text_muted": "#8A98AA",
+  "accent": "#78A9FF",
+  "accent_hover": "#8CB7FF",
+  "accent_pressed": "#6498F5",
+  "accent_soft": "#DDEAFF",
+  "outline": "#C9DBF3",
+  "outline_strong": "#AFC9EB",
+  "focus": "#6FA6FF",
+  "danger": "#E66A74",
+  "warning": "#E0A24A",
+  "success": "#35C68A",
+  "shadow_rgba": "rgba(36,59,89,0.16)",
+  "glow_rgba": "rgba(111,166,255,0.24)",
+  "backdrop_rgba": "rgba(12,19,30,0.18)"
+}

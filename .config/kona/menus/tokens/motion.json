@@ -1,0 +1,18 @@
+{
+  "surface_in_ms": 200,
+  "surface_out_ms": 155,
+  "surface_translate_px": 18,
+  "hover_ms": 120,
+  "press_ms": 90,
+  "selection_ms": 170,
+  "expand_ms": 190,
+  "collapse_ms": 165,
+  "error_shake_ms": 220,
+  "reduced_motion": {
+    "surface_translate_px": 0,
+    "surface_in_ms": 120,
+    "surface_out_ms": 100,
+    "disable_scale": true,
+    "disable_spring": true
+  }
+}

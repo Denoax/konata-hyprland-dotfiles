@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kona Settings
+Comment=Kona desktop settings
+Exec=kona-shell studio
+Icon=preferences-desktop
+Terminal=false
+Categories=Settings;Utility;
+Keywords=Kona;Desktop;Customization;

@@ -1,0 +1,15 @@
+[Unit]
+Description=Kona removable media automount and tray actions
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+ExecStart=/usr/bin/udiskie --tray
+Slice=background-graphical.slice
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5

@@ -1,0 +1,6 @@
+@import "list.rasi"
+
+window { width: 520px; }
+listview { lines: 8; }
+entry { placeholder: "Filter devices or audio actions…"; }
+element-icon { enabled: true; size: 20px; }

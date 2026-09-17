@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+"""Transient resource-policy coordinator; existing wallpaper selection stays authoritative."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import signal
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+PROFILES = ('daily', 'focus', 'gaming', 'showcase')
+SCENES = {'midnight': 'simple', 'constellation': 'static', 'constellation-motion': 'animated'}
+OPTIONS = ('animations.enabled', 'decoration.blur.enabled', 'decoration.shadow.enabled',
+           'general.allow_tearing', 'misc.vrr')
+HOME = Path.home()
+BIN = HOME / '.local/bin'
+STATE = Path(os.environ.get('XDG_STATE_HOME', HOME / '.local/state'))
+RUNTIME = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}'))
+INTENT = STATE / 'kona/profile.json'
+SESSION = RUNTIME / 'kona/profile-session.json'
+JOURNAL = RUNTIME / 'kona/profile-transition.json'
+GAMING = RUNTIME / 'kona-game-mode'
+CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', HOME / '.config')) / 'kona'
+PREVIEW = RUNTIME / 'kona/wallpaper-preview.json'
+PREVIEW_THEME = RUNTIME / 'kona/wallpaper-preview-theme'
+SCENE_IMAGES = CONFIG / 'scene-images.json'
+MOSAIC = RUNTIME / 'kona/mosaic-return.json'
+MOSAIC_THEME = RUNTIME / 'kona/mosaic-return-theme'
+
+
+def run(args, timeout=15):
+    p = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=timeout)
+    if p.returncode:
+        raise RuntimeError(f'{Path(str(args[0])).name}: {p.stderr.strip() or p.stdout.strip() or p.returncode}')
+    return p.stdout.strip()
+
+
+def read_json(path, default):
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return default
+
+
+def atomic(path, value):
+    data = json.dumps(value, indent=2, sort_keys=True) + '\n'
+    if path.exists() and path.read_text() == data:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.' + path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def intent():
+    value = read_json(INTENT, {'schema': 1, 'profile': 'daily', 'return_to': 'daily'})
+    if (not isinstance(value, dict) or value.get('schema') != 1 or
+            value.get('profile') not in PROFILES or value.get('return_to') not in PROFILES):
+        raise ValueError('invalid profile intent; restore the last valid profile.json')
+    return value
+
+
+def wallpaper_mode():
+    try:
+        mode = (STATE / 'kona-wallpaper-mode').read_text().strip()
+    except FileNotFoundError:
+        mode = 'animated'
+    if mode not in SCENES.values():
+        raise ValueError('invalid existing wallpaper mode')
+    return mode
+
+
+def view():
+    p = intent()['profile']
+    mode = wallpaper_mode()
+    return {'profile': p, 'return_to': intent()['return_to'], 'scene': next(k for k, v in SCENES.items() if v == mode),
+            'wallpaper': {'mode': mode, 'backend': 'hyprpaper' if p in ('focus', 'gaming') else 'awww'}}
+
+
+def options():
+    result = {}
+    for name in OPTIONS:
+        data = json.loads(run(['hyprctl', 'getoption', name.replace('.', ':'), '-j']))
+        key = 'int' if name == 'misc.vrr' else 'bool'
+        value = data[key]
+        if type(value) is not (int if key == 'int' else bool):
+            raise ValueError(f'invalid compositor option {name}')
+        result[name] = value
+    return result
+
+
+def bar_visible():
+    # Native Waybar hide retains alpha=1 but moves its top surface to bottom.
+    layers = json.loads(run(['hyprctl', '-j', 'layers']))
+    return any(x['namespace'] == 'waybar' and x.get('alpha', 1) > 0
+               for output in layers.values() for key, level in output['levels'].items()
+               if int(key) >= 2 for x in level)
+
+
+def identity(pid):
+    try:
+        path = Path('/proc') / str(pid)
+        fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
+        return {'pid': pid, 'start_ticks': int(fields[19]), 'state': fields[0]}
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def visualizers():
+    p = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'cava'], capture_output=True, text=True)
+    if p.returncode not in (0, 1):
+        raise RuntimeError('cannot inspect optional visualizers')
+    return [x for line in p.stdout.splitlines() if (x := identity(int(line))) and x['state'] not in ('T', 't')]
+
+
+def set_visualizers(items, paused):
+    for saved in items:
+        current = identity(saved['pid'])
+        if current and current['start_ticks'] == saved['start_ticks']:
+            os.kill(saved['pid'], signal.SIGSTOP if paused else signal.SIGCONT)
+
+
+def marker(gaming):
+    if gaming:
+        GAMING.parent.mkdir(parents=True, exist_ok=True)
+        if not GAMING.exists():
+            GAMING.touch()
+    else:
+        GAMING.unlink(missing_ok=True)
+
+
+def apply_policy(profile, mode, baseline):
+    restricted = profile in ('focus', 'gaming')
+    # Gate background history before any transition work. Explicit user recording
+    # and the on-demand overview remain separate accepted owners.
+    marker(profile == 'gaming')
+    desired = dict(baseline['options'])
+    if restricted:
+        desired.update({k: False for k in OPTIONS[:3]})
+    elif profile == 'showcase':
+        desired.update({k: True for k in OPTIONS[:3]})
+    if profile == 'gaming':
+        desired.update({'general.allow_tearing': True, 'misc.vrr': 1})
+    expression = ','.join('[' + json.dumps(k) + ']=' + json.dumps(v) for k, v in desired.items())
+    run(['hyprctl', 'eval', 'hl.config({' + expression + '})'])
+    if options() != desired:
+        raise RuntimeError('compositor did not apply requested profile options')
+    set_visualizers(baseline['visualizers'], restricted)
+    wanted = False if restricted else baseline['bar_visible']
+    if bar_visible() != wanted:
+        run(['pkill', '-USR1', '-u', str(os.getuid()), '-x', 'waybar'])
+        deadline = time.monotonic() + 3
+        while bar_visible() != wanted:
+            if time.monotonic() > deadline:
+                raise RuntimeError('Waybar visibility did not change')
+            time.sleep(.05)
+    if (BIN / 'kona-motion').exists():
+        run([BIN / 'kona-motion', profile])
+    if (BIN / 'kona-appearance').exists():
+        run([BIN / 'kona-appearance', 'reconcile', profile])
+    # This internal worker never takes the coordinator's writer lock or commits intent.
+    run([BIN / 'kona-wallpaper', '--apply-policy', profile, mode], timeout=40)
+
+
+def fresh_baseline():
+    return {'options': options(), 'bar_visible': bar_visible(), 'visualizers': visualizers()}
+
+
+def write_mode(mode):
+    path = STATE / 'kona-wallpaper-mode'
+    data = mode + '\n'
+    if path.exists() and path.read_text() == data:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix='.kona-wallpaper-mode.', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def generate_theme(mode):
+    if read_json(CONFIG / 'preferences.json', {}).get('accent') == 'cyan':
+        run([BIN / 'kona-theme', '--default'], timeout=45)
+        return
+    root = HOME / '.local/share/wallpapers/konata-command-center'
+    custom = read_json(SCENE_IMAGES, {}).get(mode)
+    if custom and preserve_theme_for(Path(custom)):
+        return
+    representative = static_fallback_for(Path(custom)) if custom and mode == 'animated' else (Path(custom) if custom else root / {'simple': 'v2/selected.png', 'static': 'center.png', 'animated': 'animated/center.webp'}[mode])
+    p = subprocess.run([str(BIN / 'kona-theme'), '--image', str(representative)], timeout=45)
+    if p.returncode:
+        print('Wallpaper applied; theme generation/reload failed (previous theme or cyan retained).', file=sys.stderr)
+
+
+def static_fallback_for(image):
+    """Use a sibling still for an animated custom scene when one is supplied."""
+    fallback = image.with_name(image.stem + '-static.png')
+    return fallback if fallback.is_file() else image
+
+
+def preserve_theme_for(image):
+    """Honor an explicit custom-wallpaper sidecar without changing global policy."""
+    marker = image.with_name(image.stem.removesuffix('-static') + '.preserve-theme')
+    return marker.is_file()
+
+
+def recover():
+    pending = read_json(JOURNAL, None)
+    if pending is None:
+        return
+    if pending.get('kind') == 'wallpaper':
+        run([BIN / 'kona-wallpaper', '--apply-policy', pending['profile'], pending['mode']], timeout=40)
+        if pending['had_mode']:
+            write_mode(pending['mode'])
+        else:
+            (STATE / 'kona-wallpaper-mode').unlink(missing_ok=True)
+        if pending.get('theme_attempted'):
+            generate_theme(pending['mode'])
+        JOURNAL.unlink()
+        return
+    apply_policy(pending['old']['profile'], pending['mode'], pending['baseline'])
+    atomic(INTENT, pending['old'])
+    atomic(SESSION, pending['session'])
+    run([BIN / 'kona-waybar-refresh', 'gaming'])
+    JOURNAL.unlink()
+
+
+def transition(target, force=False):
+    old = intent()
+    was_gaming = GAMING.exists()
+    session = read_json(SESSION, {})
+    if target == old['profile'] and session.get('applied_profile') == target and not force:
+        return False
+    baseline = session.get('baseline') or fresh_baseline()
+    mode = wallpaper_mode()
+    atomic(JOURNAL, {'old': old, 'session': session, 'baseline': baseline, 'mode': mode})
+    new = {'schema': 1, 'profile': target,
+           'return_to': (old['return_to'] if old['profile'] == 'gaming' else old['profile']) if target == 'gaming' else 'daily'}
+    try:
+        apply_policy(target, mode, baseline)
+        atomic(INTENT, new)
+        atomic(SESSION, {'applied_profile': target, **({'baseline': baseline} if target != 'daily' else {})})
+        if was_gaming != (target == 'gaming'):
+            run([BIN / 'kona-waybar-refresh', 'gaming'])
+        JOURNAL.unlink()
+    except Exception:
+        try:
+            recover()
+        except Exception as rollback:
+            print(f'kona-profile: rollback incomplete: {rollback}; transaction retained for reconcile', file=sys.stderr)
+        raise
+    return target != old['profile']
+
+
+def apply_wallpaper(action):
+    old = wallpaper_mode()
+    mode = ('static' if old == 'animated' else 'animated') if action == 'toggle' else (old if action == 'restore' else action)
+    profile = intent()['profile']
+    atomic(JOURNAL, {'kind': 'wallpaper', 'profile': profile, 'mode': old,
+                     'had_mode': (STATE / 'kona-wallpaper-mode').exists()})
+    try:
+        run([BIN / 'kona-wallpaper', '--apply-policy', profile, mode], timeout=40)
+        write_mode(mode)
+        pending = read_json(JOURNAL, {})
+        pending['theme_attempted'] = True
+        atomic(JOURNAL, pending)
+        generate_theme(mode)
+        JOURNAL.unlink()
+    except Exception:
+        try:
+            recover()
+        except Exception as rollback:
+            print(f'kona-profile: wallpaper rollback incomplete: {rollback}; journal retained', file=sys.stderr)
+        raise
+    if action != 'restore':
+        run(['notify-send', 'Wallpaper', mode.capitalize() + ' background enabled'])
+
+
+def valid_image(value):
+    image = Path(value).expanduser().resolve(strict=True)
+    if (not image.is_file() or image.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp', '.gif')
+            or any(c in str(image) for c in ('\n', '\r', ','))):
+        raise ValueError('choose a readable PNG, JPEG, WebP or GIF without comma/newline in its path')
+    return str(image)
+
+
+def preview_revert():
+    pending = read_json(PREVIEW, None)
+    if not pending:
+        return
+    # Public profile/scene writers revert first, so this captured owner is current.
+    run([BIN / 'kona-wallpaper', '--apply-policy', pending['profile'], pending['mode']], timeout=40)
+    run([BIN / 'kona-theme', '--restore', PREVIEW_THEME], timeout=45)
+    PREVIEW.unlink()
+    shutil.rmtree(PREVIEW_THEME)
+
+
+def preview_image(image):
+    image = valid_image(image)
+    pending = read_json(PREVIEW, None)
+    if pending is None:
+        pending = {'profile': intent()['profile'], 'mode': wallpaper_mode()}
+        if PREVIEW_THEME.exists():
+            shutil.rmtree(PREVIEW_THEME)
+        shutil.copytree(CONFIG / 'theme/current', PREVIEW_THEME)
+    pending['image'] = image
+    atomic(PREVIEW, pending)
+    try:
+        run([BIN / 'kona-wallpaper', '--image-policy', pending['profile'], image], timeout=40)
+        run([BIN / 'kona-theme', '--image', image], timeout=45)
+    except Exception:
+        try:
+            preview_revert()
+        except Exception as rollback:
+            print(f'kona-profile: preview rollback incomplete: {rollback}; use preview-revert', file=sys.stderr)
+        raise
+
+
+def preview_apply():
+    pending = read_json(PREVIEW, None)
+    if pending is None:
+        raise ValueError('no wallpaper preview to apply')
+    images = read_json(SCENE_IMAGES, {})
+    images[pending['mode']] = valid_image(pending['image'])
+    atomic(SCENE_IMAGES, images)
+    PREVIEW.unlink()
+    shutil.rmtree(PREVIEW_THEME)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='action', required=True)
+    for name in ('status', 'reconcile', 'startup', 'preview-revert', 'preview-apply', 'mosaic-start', 'mosaic-end'):
+        sub.add_parser(name)
+    sub.add_parser('restore-intent').add_argument('intent_json')
+    sub.add_parser('preview').add_argument('image')
+    sub.add_parser('set').add_argument('profile', choices=PROFILES)
+    sub.add_parser('gaming').add_argument('operation', choices=('on', 'off', 'toggle'))
+    sub.add_parser('scene').add_argument('scene', choices=SCENES)
+    sub.add_parser('wallpaper').add_argument('mode', choices=(*SCENES.values(), 'toggle', 'restore'))
+    args = parser.parse_args()
+    if args.action == 'status':
+        print(json.dumps(view()))
+        return
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    with (RUNTIME / 'kona-wallpaper.lock').open('w') as lock:
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError('another profile/wallpaper operation is still active')
+                time.sleep(.05)
+        recover()
+        if args.action == 'preview':
+            preview_image(args.image)
+            return
+        if args.action == 'preview-apply':
+            preview_apply()
+            return
+        preview_revert()
+        if args.action == 'preview-revert':
+            return
+        if args.action == 'restore-intent':
+            saved = json.loads(args.intent_json)
+            if (not isinstance(saved, dict) or set(saved) != {'schema', 'profile', 'return_to'} or
+                    saved['schema'] != 1 or saved['profile'] not in PROFILES or saved['return_to'] not in PROFILES):
+                raise ValueError('invalid profile return intent')
+            transition(saved['profile'])
+            atomic(INTENT, saved)
+            return
+        if args.action == 'mosaic-start':
+            if not MOSAIC.exists():
+                if MOSAIC_THEME.exists():
+                    shutil.rmtree(MOSAIC_THEME)
+                shutil.copytree(CONFIG / 'theme/current', MOSAIC_THEME)
+                atomic(MOSAIC, {'intent': intent(), 'mode': wallpaper_mode(),
+                               'theme': str(MOSAIC_THEME)})
+            transition('showcase')
+            return
+        if args.action == 'mosaic-end':
+            previous = read_json(MOSAIC, None)
+            if previous:
+                if intent()['profile'] == 'showcase':
+                    apply_wallpaper(previous['mode'])
+                    transition(previous['intent']['profile'])
+                    atomic(INTENT, previous['intent'])
+                    run([BIN / 'kona-theme', '--restore', previous['theme']], timeout=45)
+                MOSAIC.unlink()
+                if MOSAIC_THEME.exists():
+                    shutil.rmtree(MOSAIC_THEME)
+            return
+        if args.action in ('wallpaper', 'scene'):
+            apply_wallpaper(SCENES[args.scene] if args.action == 'scene' else args.mode)
+            return
+        old = intent()
+        if args.action == 'startup':
+            # Waybar starts asynchronously in the same native startup callback.
+            # A bounded readiness wait prevents capturing its not-yet-shown bar
+            # as the user's intended hidden daily state. No resident monitor.
+            deadline = time.monotonic() + 10
+            while not bar_visible():
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Waybar did not become ready; run kona-profile reconcile after recovery')
+                time.sleep(.1)
+        if args.action == 'gaming':
+            enabled = old['profile'] == 'gaming'
+            on = not enabled if args.operation == 'toggle' else args.operation == 'on'
+            if not on and not enabled:
+                return
+            target = 'gaming' if on else old['return_to']
+        else:
+            target = args.profile if args.action == 'set' else old['profile']
+        changed = transition(target, force=args.action in ('reconcile', 'startup'))
+        if args.action == 'startup':
+            generate_theme(wallpaper_mode())
+        if changed and ((old['profile'] == 'gaming') != (target == 'gaming')):
+            try:
+                run([BIN / 'kona-osd', 'message',
+                     'Gaming mode ' + ('enabled' if target == 'gaming' else 'disabled'),
+                     'applications-games-symbolic'], timeout=5)
+            except (OSError, RuntimeError, subprocess.SubprocessError) as feedback:
+                # Accepted gaming feedback is best-effort; committed policy remains valid.
+                print(f'kona-profile: OSD feedback failed: {feedback}', file=sys.stderr)
+        if changed:
+            run(['notify-send', '-a', 'Kona Profile', target.capitalize() + ' profile',
+                 {'daily': 'Your normal desktop policy is restored.',
+                  'focus': 'Static wallpaper, quiet effects and hidden bar. Super+Ctrl+P changes profile.',
+                  'gaming': 'Static wallpaper, quiet effects and hidden bar. Super+Ctrl+P changes profile.',
+                  'showcase': 'Full effects and your selected scene. Super+Shift+W selects wallpapers.'}[target]])
+        print(json.dumps(view()))
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f'kona-profile: {error}', file=sys.stderr)
+        sys.exit(1)

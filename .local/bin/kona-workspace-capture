@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  --visible) requested=all ;;
+  [1-9]|10) requested="$1" ;;
+  *) printf 'usage: %s {1..10|--visible}\n' "$0" >&2; exit 2 ;;
+esac
+[[ $# == 1 ]] || exit 2
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+root="$runtime/kona-overview"
+mkdir -p "$root"
+
+# Overview shares this writer lock. Bound waits rather than accumulate stale
+# queued captures when an output or grim stops responding.
+exec 8>"$runtime/kona-workspace-history.lock"
+flock -w 8 8 || exit 1
+if [[ "$requested" != all ]]; then
+  [[ ! -f "$runtime/kona-game-mode" ]] || exit 0
+  exec 9>"$root/overview.lock"
+  flock -n 9 || exit 0
+  flock -u 9
+fi
+
+monitors="$(timeout 3 hyprctl monitors -j)"
+rows="$(jq -r --arg request "$requested" '
+  .[] | select(.activeWorkspace.id >= 1 and .activeWorkspace.id <= 10) |
+  select($request == "all" or (.activeWorkspace.id|tostring) == $request) |
+  [.name, (.activeWorkspace.id|tostring), (.specialWorkspace.id // 0|tostring)] | @tsv' <<< "$monitors")"
+temporary=''
+trap '[[ -z "$temporary" ]] || rm -f "$temporary"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+result=0
+while IFS=$'\t' read -r output workspace special; do
+  [[ -n "$output" ]] || continue
+  temporary="$(mktemp "$root/.workspace-$workspace.XXXXXX.png")"
+  if timeout 4 grim -o "$output" "$temporary"; then
+    after="$(timeout 3 hyprctl monitors -j)" || exit 1
+    if [[ -s "$temporary" ]] && jq -e --arg output "$output" --argjson workspace "$workspace" --argjson special "$special" \
+      'any(.[]; .name == $output and .activeWorkspace.id == $workspace and (.specialWorkspace.id // 0) == $special)' <<< "$after" >/dev/null; then
+      mv "$temporary" "$root/workspace-$workspace.png"
+    fi
+  else
+    printf 'Kona thumbnail capture failed: %s workspace %s\n' "$output" "$workspace" >&2
+    result=1
+  fi
+  rm -f "$temporary"
+  temporary=''
+done <<< "$rows"
+exit "$result"

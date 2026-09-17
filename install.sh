@@ -19,12 +19,21 @@ done
 backup_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona/pre-restore-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$backup_root/config" "$backup_root/bin" "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share"
 
-configs=(cava hypr kitty nwg-dock-hyprland nwg-drawer rofi swaync swayosd uwsm waybar xdg-desktop-portal)
+configs=(quickshell cava hypr kitty kona nwg-dock-hyprland nwg-drawer rofi swaync swayosd uwsm waybar xdg-desktop-portal)
 for config in "${configs[@]}"; do
   if [[ -d "$HOME/.config/$config" ]]; then
     cp -a "$HOME/.config/$config" "$backup_root/config/"
   fi
 done
+
+# Back up only the unit paths this repository owns, never unrelated user units.
+while IFS= read -r unit; do
+  relative="systemd/user/$unit"
+  if [[ -f "$HOME/.config/$relative" ]]; then
+    mkdir -p "$backup_root/config/$(dirname "$relative")"
+    cp -a "$HOME/.config/$relative" "$backup_root/config/$relative"
+  fi
+done < "$repo_root/packages/kona-user-units.txt"
 
 if [[ -d "$repo_root/.local/bin" ]]; then
   rsync -a "$repo_root/.local/bin/" "$HOME/.local/bin/"

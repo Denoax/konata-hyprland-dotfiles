@@ -8,10 +8,10 @@
   "layer-shell": true,
   "layer-shell-cover-screen": false,
   "cssPriority": "user",
-  "control-center-margin-top": 46,
-  "control-center-margin-bottom": 10,
-  "control-center-margin-right": 10,
-  "control-center-margin-left": 10,
+  "control-center-margin-top": 14,
+  "control-center-margin-bottom": 14,
+  "control-center-margin-right": 14,
+  "control-center-margin-left": 14,
   "notification-2fa-action": true,
   "notification-inline-replies": true,
   "notification-body-image-height": 120,
@@ -21,29 +21,45 @@
   "timeout-critical": 0,
   "fit-to-screen": true,
   "relative-timestamps": true,
-  "control-center-width": 460,
-  "control-center-height": 780,
-  "notification-window-width": 430,
+  "control-center-width": 500,
+  "control-center-height": 1000,
+  "notification-window-width": 420,
   "keyboard-shortcuts": true,
   "notification-grouping": true,
   "image-visibility": "when-available",
-  "transition-time": 180,
+  "transition-time": 200,
   "hide-on-clear": false,
   "hide-on-action": true,
-  "text-empty": "All clear // time to game",
+  "text-empty": "No notifications",
   "script-fail-notify": true,
-  "widgets": ["title", "dnd", "mpris", "volume", "buttons-grid", "notifications"],
+  "scripts": {
+    "kona-action-sound": {
+      "exec": "\"$HOME/.local/bin/kona-menu-sound\"",
+      "run-on": "action"
+    }
+  },
+  "widgets": [
+    "title#identity",
+    "dnd",
+    "buttons-grid#quick",
+    "mpris",
+    "volume",
+    "menubar#audio",
+    "menubar#system",
+    "title",
+    "notifications"
+  ],
   "widget-config": {
     "notifications": {
       "vexpand": true
     },
     "title": {
-      "text": "KONA // NOTIFICATIONS",
+      "text": "Notifications",
       "clear-all-button": true,
-      "button-text": "CLEAR"
+      "button-text": "Clear"
     },
     "dnd": {
-      "text": "DO NOT DISTURB"
+      "text": "Do not disturb"
     },
     "mpris": {
       "blacklist": [],
@@ -54,30 +70,120 @@
     "volume": {
       "label": "󰕾"
     },
-    "buttons-grid": {
-      "buttons-per-row": 4,
+    "title#identity": {
+      "text": "Notifications",
+      "clear-all-button": false
+    },
+    "buttons-grid#quick": {
+      "buttons-per-row": 3,
       "actions": [
         {
-          "label": "󰤨  WIFI",
-          "type": "normal",
-          "command": "sh -c 'nmcli radio wifi | grep -q enabled && nmcli radio wifi off || nmcli radio wifi on'"
+          "label": "󰤨  Wi-Fi",
+          "type": "toggle",
+          "command": "case \\\"${SWAYNC_TOGGLE_STATE:-}\\\" in true|false) ;; *) exit 2 ;; esac; if [ \\\"$SWAYNC_TOGGLE_STATE\\\" = true ]; then exec nmcli radio wifi on; else exec nmcli radio wifi off; fi",
+          "update-command": "state=$(nmcli radio wifi) || exit; [ \\\"$state\\\" = enabled ] && echo true || echo false"
         },
         {
-          "label": "󰂯  BT",
+          "label": "󰂯  Bluetooth",
           "type": "normal",
-          "command": "blueman-manager"
+          "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-bluetooth-menu\\\""
         },
         {
-          "label": "󰍹  LOOK",
-          "type": "normal",
-          "command": "nwg-look"
+          "label": "󰖨  Night light",
+          "type": "toggle",
+          "command": "case \\\"${SWAYNC_TOGGLE_STATE:-}\\\" in true|false) ;; *) exit 2 ;; esac; active=false; [ -f \\\"${XDG_STATE_HOME:-$HOME/.local/state}/kona/night-light-manual\\\" ] && active=true; if [ \\\"$active\\\" != \\\"$SWAYNC_TOGGLE_STATE\\\" ]; then exec \\\"$HOME/.local/bin/kona-night-light\\\" toggle; fi",
+          "update-command": "[ -f \\\"${XDG_STATE_HOME:-$HOME/.local/state}/kona/night-light-manual\\\" ] && echo true || echo false"
         },
         {
-          "label": "󰌾  LOCK",
+          "label": "󰊴  Gaming",
+          "type": "toggle",
+          "command": "case \\\"${SWAYNC_TOGGLE_STATE:-}\\\" in true|false) ;; *) exit 2 ;; esac; if [ \\\"$SWAYNC_TOGGLE_STATE\\\" = true ]; then exec \\\"$HOME/.local/bin/kona-game-mode\\\" on; else exec \\\"$HOME/.local/bin/kona-game-mode\\\" off; fi",
+          "update-command": "state=$(\\\"$HOME/.local/bin/kona-game-mode\\\" status) || exit; [ \\\"$state\\\" = on ] && echo true || echo false"
+        },
+        {
+          "label": "󰑋  Record",
+          "type": "toggle",
+          "command": "case \\\"${SWAYNC_TOGGLE_STATE:-}\\\" in true|false) ;; *) exit 2 ;; esac; active=$(\\\"$HOME/.local/bin/kona-record-status\\\") || exit; active=$(printf \\\"%s\\\" \\\"$active\\\" | jq -r ' .class == \\\"recording\\\" ') || exit; if [ \\\"$active\\\" != \\\"$SWAYNC_TOGGLE_STATE\\\" ]; then exec \\\"$HOME/.local/bin/kona-record\\\" output; fi",
+          "update-command": "\\\"$HOME/.local/bin/kona-record-status\\\" | jq -r '.class == \\\"recording\\\"'"
+        },
+        {
+          "label": "󰍹  Workspaces",
           "type": "normal",
-          "command": "hyprlock"
+          "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-overview\\\""
         }
       ]
+    },
+    "menubar#audio": {
+      "buttons#devices": {
+        "position": "left",
+        "actions": [
+          {
+            "label": "Devices",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-audio-menu\\\""
+          },
+          {
+            "label": "App mixer",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-app-mixer\\\""
+          }
+        ]
+      }
+    },
+    "menubar#system": {
+      "menu#tools": {
+        "label": "System  ▾",
+        "position": "left",
+        "animation-type": "slide_down",
+        "animation-duration": 190,
+        "actions": [
+          {
+            "label": "Updates and rollback",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-updates\\\""
+          },
+          {
+            "label": "Backup…",
+            "type": "normal",
+            "command": "swaync-client -cp; \\\"$HOME/.local/bin/kona-confirm\\\" \\\"Sync, commit, and push desktop backup?\\\" \\\"Sync, commit, and push\\\" || exit 0; exec \\\"$HOME/.local/bin/kona-backup\\\""
+          },
+          {
+            "label": "Network connections",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-network-menu\\\""
+          },
+          {
+            "label": "Bluetooth devices",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-bluetooth-menu\\\""
+          },
+          {
+            "label": "Appearance",
+            "type": "normal",
+            "command": "swaync-client -cp; exec nwg-look"
+          },
+          {
+            "label": "System settings",
+            "type": "normal",
+            "command": "swaync-client -cp; exec systemsettings"
+          }
+        ]
+      },
+      "buttons#session": {
+        "position": "right",
+        "actions": [
+          {
+            "label": "󰌾  Lock",
+            "type": "normal",
+            "command": "swaync-client -cp; exec hyprlock"
+          },
+          {
+            "label": "  Power and session…",
+            "type": "normal",
+            "command": "swaync-client -cp; exec \\\"$HOME/.local/bin/kona-session-menu\\\""
+          }
+        ]
+      }
     }
   }
 }

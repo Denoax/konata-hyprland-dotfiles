@@ -1,0 +1,549 @@
+#!/usr/bin/env python3
+"""Atomic Kona semantic palette owner; runs on demand and leaves no resident helper."""
+import argparse
+import colorsys
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+
+COLOR = re.compile(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\Z")
+RGBA = re.compile(r"rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\)\Z")
+MODES = ("light", "dark")
+APPEARANCE_ROLES = {
+    "background", "surface", "surface_alt", "surface_elevated", "surface_pressed",
+    "text", "text_secondary", "text_muted", "accent", "accent_hover",
+    "accent_pressed", "accent_soft", "outline", "outline_strong", "focus",
+    "danger", "warning", "success", "shadow", "glow", "scrim",
+}
+LEGACY_ROLES = {
+    "bg.0", "bg.1", "bg.2", "bg.translucent", "text.primary", "text.secondary",
+    "text.disabled", "accent.primary", "accent.secondary", "accent.on", "accent.border",
+    "line.subtle", "line.active", "state.success", "state.warning", "state.danger",
+    "shadow.soft", "glow.active",
+}
+FRAGMENTS = (
+    "tokens.json", "appearance.json", "waybar.css", "rofi.rasi", "swaync.css",
+    "swayosd.css", "kitty.conf", "hyprland.colors",
+)
+
+
+def rgb(color):
+    return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def luminance(color):
+    values = [v / 255 for v in rgb(color)]
+    linear = [v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4 for v in values]
+    return sum(a * b for a, b in zip(linear, (.2126, .7152, .0722)))
+
+
+def contrast(a, b):
+    bright, dark = sorted((luminance(a), luminance(b)), reverse=True)
+    return (bright + .05) / (dark + .05)
+
+
+def rgba(color, alpha):
+    return f'rgba({", ".join(map(str, rgb(color)))}, {alpha:g})'
+
+
+def hex_alpha(color, alpha):
+    return color[:7] + f'{round(max(0, min(1, alpha)) * 255):02x}'
+
+
+def rgba_hex(value):
+    match = RGBA.fullmatch(value)
+    if not match:
+        raise ValueError(f"invalid rgba color: {value}")
+    red, green, blue = (int(match.group(i)) for i in range(1, 4))
+    if any(channel > 255 for channel in (red, green, blue)):
+        raise ValueError(f"invalid rgba channel: {value}")
+    return f'#{red:02x}{green:02x}{blue:02x}{round(float(match.group(4)) * 255):02x}'
+
+
+def validate_appearance(value):
+    if not isinstance(value, dict) or set(value) != APPEARANCE_ROLES | {"mode"}:
+        raise ValueError("invalid semantic appearance role set")
+    if value["mode"] not in MODES:
+        raise ValueError("appearance mode must be light or dark")
+    for key in APPEARANCE_ROLES - {"shadow", "glow", "scrim"}:
+        if not isinstance(value[key], str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value[key]):
+            raise ValueError(f"invalid opaque appearance color: {key}")
+    for key in ("shadow", "glow", "scrim"):
+        rgba_hex(value[key])
+    for surface in ("background", "surface", "surface_alt", "surface_elevated", "surface_pressed"):
+        if contrast(value["text"], value[surface]) < 7:
+            raise ValueError(f"insufficient text/{surface} contrast")
+        if contrast(value["text_secondary"], value[surface]) < 4.5:
+            raise ValueError(f"insufficient secondary text/{surface} contrast")
+    return value
+
+
+def validate_legacy(tokens):
+    if not isinstance(tokens, dict) or set(tokens) != LEGACY_ROLES:
+        raise ValueError("invalid legacy semantic token set")
+    if any(not isinstance(value, str) or not COLOR.fullmatch(value) for value in tokens.values()):
+        raise ValueError("invalid legacy semantic color")
+    translucent = {"bg.translucent", "line.subtle", "shadow.soft", "glow.active"}
+    if any(len(tokens[key]) != 7 for key in LEGACY_ROLES - translucent):
+        raise ValueError("opaque legacy roles must use RGB colors")
+    for surface in ("bg.0", "bg.1", "bg.2"):
+        for foreground in ("text.primary", "text.secondary"):
+            if contrast(tokens[foreground], tokens[surface]) < 4.5:
+                raise ValueError(f"insufficient {foreground}/{surface} contrast")
+    if contrast(tokens["accent.on"], tokens["accent.primary"]) < 4.5:
+        raise ValueError("insufficient selection contrast")
+    return tokens
+
+
+def validate(value):
+    return validate_appearance(value) if isinstance(value, dict) and "mode" in value else validate_legacy(value)
+
+
+def appearance_tokens(root, mode):
+    path = root.parent / "appearance" / f"{mode}.json"
+    return validate_appearance(json.loads(path.read_text()))
+
+
+def legacy_tokens(appearance):
+    validate_appearance(appearance)
+    on_accent = appearance["text"] if appearance["mode"] == "light" else appearance["background"]
+    result = {
+        "bg.0": appearance["background"], "bg.1": appearance["surface"],
+        "bg.2": appearance["surface_alt"], "bg.translucent": hex_alpha(appearance["surface"], .97),
+        "text.primary": appearance["text"], "text.secondary": appearance["text_secondary"],
+        "text.disabled": appearance["text_muted"], "accent.primary": appearance["accent"],
+        "accent.secondary": appearance["accent_hover"], "accent.on": on_accent,
+        "accent.border": appearance["outline_strong"],
+        "line.subtle": hex_alpha(appearance["outline"], .72), "line.active": appearance["focus"],
+        "state.success": appearance["success"], "state.warning": appearance["warning"],
+        "state.danger": appearance["danger"], "shadow.soft": rgba_hex(appearance["shadow"]),
+        "glow.active": rgba_hex(appearance["glow"]),
+    }
+    return validate_legacy(result)
+
+
+def hex_rgba(value):
+    red, green, blue = rgb(value)
+    alpha = int(value[7:9], 16) / 255 if len(value) == 9 else 1
+    return rgba(f"#{red:02x}{green:02x}{blue:02x}", alpha)
+
+
+def legacy_appearance(tokens):
+    validate_legacy(tokens)
+    mode = "light" if luminance(tokens["bg.1"]) > .5 else "dark"
+    return validate_appearance({
+        "mode": mode,
+        "background": tokens["bg.0"], "surface": tokens["bg.1"],
+        "surface_alt": tokens["bg.2"], "surface_elevated": tokens["bg.1"],
+        "surface_pressed": tokens["bg.2"], "text": tokens["text.primary"],
+        "text_secondary": tokens["text.secondary"], "text_muted": tokens["text.disabled"],
+        "accent": tokens["accent.primary"], "accent_hover": tokens["accent.secondary"],
+        "accent_pressed": tokens["accent.border"], "accent_soft": tokens["bg.2"],
+        "outline": tokens["accent.border"], "outline_strong": tokens["line.active"],
+        "focus": tokens["line.active"], "danger": tokens["state.danger"],
+        "warning": tokens["state.warning"], "success": tokens["state.success"],
+        "shadow": hex_rgba(tokens["shadow.soft"]), "glow": hex_rgba(tokens["glow.active"]),
+        "scrim": rgba("#000000", .38 if mode == "dark" else .18),
+    })
+
+
+def readable_tint(color, background, minimum=4.5):
+    if contrast(color, background) >= minimum:
+        return color
+    hue, light, saturation = colorsys.rgb_to_hls(*(value / 255 for value in rgb(color)))
+    candidates = []
+    for step in range(1, 90):
+        candidate_light = step / 100
+        candidate = '#' + ''.join(f'{round(value * 255):02x}' for value in colorsys.hls_to_rgb(hue, candidate_light, saturation))
+        if contrast(candidate, background) >= minimum:
+            candidates.append((abs(candidate_light - light), candidate))
+    if not candidates:
+        return "#000000" if contrast("#000000", background) >= minimum else "#ffffff"
+    return min(candidates)[1]
+
+
+def constrain(color, background):
+    if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        raise ValueError("Matugen accent is not an RGB hex color")
+    hue, light, saturation = colorsys.rgb_to_hls(*(value / 255 for value in rgb(color)))
+    saturation = min(.95, max(.55, saturation))
+    candidates = []
+    for step in range(18, 82):
+        candidate_light = step / 100
+        candidate = '#' + ''.join(f'{round(value * 255):02x}' for value in colorsys.hls_to_rgb(hue, candidate_light, saturation))
+        if contrast(candidate, background) >= 3:
+            candidates.append((abs(candidate_light - light), candidate))
+    if not candidates:
+        raise ValueError("cannot constrain wallpaper accent")
+    return min(candidates)[1]
+
+
+def image_appearance(root, image, appearance):
+    image = Path(image).expanduser().resolve(strict=True)
+    if not image.is_file():
+        raise ValueError("wallpaper is not a regular file")
+    mode = appearance["mode"]
+    result = subprocess.run([
+        "matugen", "image", str(image), "--config", str(root / "matugen.toml"),
+        "--dry-run", "--source-color-index", "0", "--mode", mode, "--json", "hex",
+    ], capture_output=True, text=True, timeout=30, check=True)
+    colors = json.loads(result.stdout)["colors"]
+    output = dict(appearance)
+    primary = colors["primary"].get(mode) or colors["primary"]["dark"]
+    secondary = colors["secondary"].get(mode) or colors["secondary"]["dark"]
+    output["accent"] = constrain(primary["color"], output["surface_alt"])
+    output["accent_hover"] = constrain(secondary["color"], output["surface_alt"])
+    output["accent_pressed"] = output["accent"]
+    output["focus"] = output["accent"]
+    output["glow"] = rgba(output["accent"], .27 if mode == "dark" else .24)
+    return validate_appearance(output)
+
+
+def image_tokens(root, image, base):
+    appearance = base if "mode" in base else legacy_appearance(base)
+    result = image_appearance(root, image, appearance)
+    return result if "mode" in base else legacy_tokens(result)
+
+
+def render(value):
+    appearance = validate_appearance(value) if "mode" in value else legacy_appearance(value)
+    tokens = legacy_tokens(appearance)
+    accent_text = readable_tint(appearance["accent_pressed"], appearance["surface_elevated"])
+    danger_text = readable_tint(appearance["danger"], appearance["surface_pressed"])
+    waybar = ''.join(f'@define-color {key} {color};\n' for key, color in {
+        "ink": appearance["background"], "panel": rgba(appearance["surface"], .94),
+        "panel-soft": rgba(appearance["surface_alt"], .90), "line": appearance["outline"],
+        "cyan": appearance["accent"], "sky": appearance["accent_hover"],
+        "text": appearance["text"], "muted": appearance["text_secondary"],
+        "green": appearance["success"], "accent-on": tokens["accent.on"],
+        "danger": appearance["danger"],
+    }.items())
+    waybar += ''.join(f'@define-color accent-{amount} {rgba(appearance["accent"], amount / 100)};\n' for amount in (12, 22, 35))
+    waybar += f'@define-color secondary-line {rgba(appearance["accent_hover"], .24)};\n'
+    rofi_values = {
+        "bg": hex_alpha(appearance["surface"], .97), "bg-alt": appearance["surface_alt"],
+        "bg-elevated": appearance["surface_elevated"], "bg-pressed": appearance["surface_pressed"],
+        "fg": appearance["text"], "muted": appearance["text_secondary"],
+        "faint": appearance["text_muted"], "placeholder-text": appearance["text_secondary"],
+        "accent": appearance["accent"], "accent-text": accent_text,
+        "accent-hover": appearance["accent_hover"], "accent-soft": appearance["accent_soft"],
+        "outline": appearance["outline"], "outline-strong": appearance["outline_strong"],
+        "danger": appearance["danger"], "danger-text": danger_text,
+        "warning": appearance["warning"], "success": appearance["success"],
+        "cyan": appearance["accent"], "sky": appearance["accent_hover"],
+        "selected-fg": tokens["accent.on"], "input-line": rgba(appearance["focus"], .35),
+    }
+    rofi = '/* Generated by kona-theme; geometry lives in shared.rasi. */\n* {\n' + ''.join(f'  {key}: {color};\n' for key, color in rofi_values.items()) + '}\n'
+    sway_colors = {
+        "kona_bg": appearance["background"], "kona_surface": appearance["surface"],
+        "kona_surface_alt": appearance["surface_alt"], "kona_surface_elevated": appearance["surface_elevated"],
+        "kona_surface_pressed": appearance["surface_pressed"], "kona_fg": appearance["text"],
+        "kona_muted": appearance["text_secondary"], "kona_faint": appearance["text_muted"],
+        "kona_accent": appearance["accent"], "kona_accent_hover": appearance["accent_hover"],
+        "kona_accent_soft": appearance["accent_soft"], "kona_outline": appearance["outline"],
+        "kona_outline_strong": appearance["outline_strong"], "kona_focus": appearance["focus"],
+        "kona_danger": appearance["danger"], "kona_danger_text": danger_text,
+        "kona_warning": appearance["warning"], "kona_success": appearance["success"],
+        "kona_shadow": appearance["shadow"],
+    }
+    sway = '/* Generated by kona-theme; component geometry remains in style.css. */\n' + ''.join(f'@define-color {key} {color};\n' for key, color in sway_colors.items())
+    ansi = {
+        0: appearance["background"], 1: appearance["danger"], 2: appearance["success"],
+        3: appearance["warning"], 4: appearance["accent_pressed"], 5: "#8D7DF2",
+        6: appearance["accent_hover"], 7: appearance["text_secondary"],
+        8: appearance["text_muted"], 9: appearance["danger"], 10: appearance["success"],
+        11: appearance["warning"], 12: appearance["accent_hover"], 13: "#B9AAFF",
+        14: appearance["focus"], 15: appearance["surface_elevated"],
+    }
+    kitty = ''.join([
+        f'background {appearance["surface"]}\n', f'foreground {appearance["text"]}\n',
+        f'selection_background {appearance["accent_soft"]}\n', f'selection_foreground {appearance["text"]}\n',
+        f'cursor {appearance["focus"]}\n', f'cursor_text_color {appearance["background"]}\n',
+        f'url_color {accent_text}\n',
+    ]) + ''.join(f'color{index} {color}\n' for index, color in ansi.items()) + ''.join([
+        f'active_tab_background {appearance["accent"]}\n', f'active_tab_foreground {tokens["accent.on"]}\n',
+        f'inactive_tab_background {appearance["surface_alt"]}\n', f'inactive_tab_foreground {appearance["text_secondary"]}\n',
+    ])
+    return {
+        "tokens.json": json.dumps(tokens, indent=2, sort_keys=True) + '\n',
+        "appearance.json": json.dumps(appearance, indent=2, sort_keys=True) + '\n',
+        "waybar.css": waybar, "rofi.rasi": rofi, "swaync.css": sway,
+        "swayosd.css": sway, "kitty.conf": kitty,
+        "hyprland.colors": appearance["accent"][1:] + '\n' + appearance["outline_strong"][1:] + '\n',
+    }
+
+
+def source_appearance(directory):
+    try:
+        appearance = directory / "appearance.json"
+        if appearance.exists():
+            return validate_appearance(json.loads(appearance.read_text()))
+        return legacy_appearance(json.loads((directory / "tokens.json").read_text()))
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def complete(directory):
+    try:
+        expected = render(json.loads((directory / "appearance.json").read_text()))
+        return expected if all((directory / name).read_text() == data for name, data in expected.items()) else None
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def sync_directory(path):
+    descriptor = os.open(path, os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def publish_appearance(root, data):
+    target = root.parent / "appearance/current.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.read_text() == data:
+        return
+    descriptor, name = tempfile.mkstemp(prefix=".current.", dir=target.parent)
+    try:
+        with os.fdopen(descriptor, "w") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, target)
+        sync_directory(target.parent)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def activate(root, files):
+    current = root / "current"
+    old = complete(current)
+    previous = current.resolve() if current.exists() else None
+    changed = [name for name in FRAGMENTS if old is None or old[name] != files[name]]
+    if not changed:
+        publish_appearance(root, files["appearance.json"])
+        return []
+    generations = root / "generations"
+    generations.mkdir(exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=".stage-", dir=generations))
+    try:
+        for name, data in files.items():
+            with (stage / name).open("w") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+        if complete(stage) != files:
+            raise ValueError("incomplete staged theme")
+        destination = generations / ("theme-" + uuid.uuid4().hex)
+        sync_directory(stage)
+        os.rename(stage, destination)
+        sync_directory(generations)
+        link = root / ".current-next"
+        link.unlink(missing_ok=True)
+        link.symlink_to(destination.relative_to(root))
+        os.replace(link, current)
+        sync_directory(root)
+        publish_appearance(root, files["appearance.json"])
+        for path in generations.iterdir():
+            if re.fullmatch(r"theme-[0-9a-f]{32}", path.name) and path not in (destination, previous):
+                shutil.rmtree(path)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+    return changed
+
+
+def hyprland_environment():
+    environment = os.environ.copy()
+    runtime = Path(environment.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "hypr"
+    instances = []
+    try:
+        result = subprocess.run(["hyprctl", "instances", "-j"], capture_output=True, text=True, timeout=4, env=environment)
+        if result.returncode == 0:
+            instances = json.loads(result.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    live = [instance for instance in instances
+            if isinstance(instance, dict) and instance.get("instance")
+            and (runtime / instance["instance"] / ".socket.sock").exists()
+            and Path(f'/proc/{instance.get("pid", 0)}').exists()]
+    if live:
+        wayland = environment.get("WAYLAND_DISPLAY")
+        matching = [instance for instance in live if instance.get("wl_socket") == wayland]
+        chosen = max(matching or live, key=lambda instance: instance.get("time", 0))
+        environment["HYPRLAND_INSTANCE_SIGNATURE"] = chosen["instance"]
+    else:
+        candidates = sorted(runtime.glob("*/.socket.sock"), key=lambda path: path.stat().st_mtime)
+        if not candidates:
+            return None
+        environment["HYPRLAND_INSTANCE_SIGNATURE"] = candidates[-1].parent.name
+    return environment
+
+
+def run_reload(command, environment=None):
+    result = subprocess.run(command, capture_output=True, text=True, timeout=7, env=environment)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}")
+
+
+def swayosd_command():
+    return [
+        Path.home() / ".local/opt/kona-pkgs/swayosd/usr/bin/swayosd-server",
+        "--config", Path.home() / ".config/swayosd/config.toml",
+        "--style", Path.home() / ".config/swayosd/style.css",
+    ]
+
+
+def matching_processes(command):
+    expected = [os.fsencode(str(value)) for value in command]
+    matches = []
+    for entry in Path("/proc").glob("[0-9]*"):
+        try:
+            arguments = (entry / "cmdline").read_bytes().rstrip(b"\0").split(b"\0")
+            if arguments == expected:
+                matches.append(int(entry.name))
+        except (FileNotFoundError, PermissionError, ProcessLookupError, ValueError):
+            pass
+    return matches
+
+
+def reload_swayosd(environment):
+    unit = ["systemctl", "--user", "is-active", "--quiet", "kona-osd.service"]
+    if subprocess.run(unit, capture_output=True, timeout=5).returncode == 0:
+        run_reload(["systemctl", "--user", "restart", "kona-osd.service"])
+        return
+    command = swayosd_command()
+    old = matching_processes(command)
+    if not old:
+        return
+    for pid in old:
+        os.kill(pid, signal.SIGTERM)
+    deadline = time.monotonic() + 5
+    while any(Path(f"/proc/{pid}").exists() for pid in old):
+        if time.monotonic() >= deadline:
+            raise RuntimeError("direct SwayOSD owner did not stop")
+        time.sleep(.05)
+    subprocess.Popen(
+        [str(value) for value in command], env=environment,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+    )
+    deadline = time.monotonic() + 3
+    while not matching_processes(command):
+        if time.monotonic() >= deadline:
+            raise RuntimeError("direct SwayOSD owner did not restart")
+        time.sleep(.05)
+
+
+def reload_consumers(root, changed):
+    pending = root / "reload-pending.json"
+    if pending.exists():
+        changed = sorted(set(changed) | set(json.loads(pending.read_text())))
+    if not changed:
+        return []
+    compositor_environment = hyprland_environment()
+    if compositor_environment is None:
+        return []
+    failed = []
+    for name in changed:
+        try:
+            if name == "waybar.css":
+                style = root.parent.parent / "waybar/style.css"
+                content = style.read_bytes()
+                if not content:
+                    raise RuntimeError("Waybar stylesheet is empty")
+                style.write_bytes(content)
+            elif name == "swaync.css":
+                run_reload(["swaync-client", "--skip-wait", "--reload-css"])
+            elif name == "swayosd.css":
+                reload_swayosd(compositor_environment)
+            elif name == "kitty.conf":
+                subprocess.run(["pkill", "-USR1", "-x", "kitty"], capture_output=True, timeout=5)
+            elif name == "hyprland.colors":
+                active, inactive = (root / "current/hyprland.colors").read_text().splitlines()
+                expression = ('hl.config({ general = { col = { active_border = { colors = { "rgba('
+                    + active + 'ff)", "rgba(' + inactive + 'ff)" }, angle = 45 } } }, group = { col = { border_active = "rgba('
+                    + active + 'ff)" } } })')
+                if compositor_environment is not None:
+                    run_reload(["hyprctl", "eval", expression], compositor_environment)
+        except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+            failed.append(name)
+            print(f"kona-theme: {name} reload failed: {error}", file=sys.stderr)
+    if failed:
+        temporary = root / ".reload-pending"
+        temporary.write_text(json.dumps(failed))
+        os.replace(temporary, pending)
+    else:
+        pending.unlink(missing_ok=True)
+    return failed
+
+
+def current_mode():
+    state = Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state"))) / "kona/appearance.json"
+    try:
+        value = json.loads(state.read_text())
+        return value["mode"] if value.get("mode") in MODES else "dark"
+    except (OSError, ValueError, TypeError):
+        return "dark"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--image", type=Path)
+    source.add_argument("--default", action="store_true")
+    source.add_argument("--restore", type=Path, help="restore a validated generation")
+    parser.add_argument("--mode", choices=MODES)
+    parser.add_argument("--no-reload", action="store_true", help="offline generation/install")
+    args = parser.parse_args()
+    root = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "kona/theme"
+    root.mkdir(parents=True, exist_ok=True)
+    with (root / ".lock").open("w") as lock:
+        deadline = time.monotonic() + 40
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("theme lock timed out")
+                time.sleep(.05)
+        mode = args.mode or current_mode()
+        reason = None
+        try:
+            if args.restore:
+                appearance = source_appearance(args.restore)
+                if appearance is None:
+                    raise ValueError("incomplete theme restore generation")
+            else:
+                appearance = appearance_tokens(root, mode)
+                if args.image:
+                    appearance = image_appearance(root, args.image, appearance)
+            files = render(appearance)
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+            reason = f"{type(error).__name__}: {error}"
+            if isinstance(error, subprocess.CalledProcessError) and error.stderr:
+                reason += ": " + error.stderr.strip()[-500:]
+            print(f"kona-theme: generation failed; retaining valid theme or semantic fallback: {reason}", file=sys.stderr)
+            files = complete(root / "current") or render(appearance_tokens(root, mode))
+        changed = activate(root, files)
+        failed = [] if args.no_reload else reload_consumers(root, changed)
+        print(json.dumps({"mode": mode, "changed": changed, "fallback_reason": reason, "reload_failed": failed}))
+        return 1 if reason or failed else 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, TimeoutError) as error:
+        print(f"kona-theme: {error}", file=sys.stderr)
+        sys.exit(1)

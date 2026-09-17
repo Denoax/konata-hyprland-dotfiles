@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Reserved Kona RT offsets, paired with Waybar config.jsonc.
+case "${1:-}" in
+  recording) offset=8 ;;
+  gaming) offset=9 ;;
+  *) printf 'usage: %s {recording|gaming}\n' "$0" >&2; exit 2 ;;
+esac
+[[ $# == 1 ]] || exit 2
+# Exact process name and effective UID: never signal another user's bar.
+# pkill returns 1 when Waybar is absent (normal during restart).
+pkill -"RTMIN+$offset" -u "$UID" -x waybar && exit 0
+result=$?
+[[ $result == 1 ]] && exit 0
+exit "$result"

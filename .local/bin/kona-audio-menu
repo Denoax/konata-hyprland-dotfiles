@@ -1,23 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme="$HOME/.config/rofi/konata.rasi"
+theme="$HOME/.config/rofi/audio.rasi"
 default_sink="$(pactl get-default-sink)"
 default_source="$(pactl get-default-source)"
 records="$(mktemp)"
-trap 'rm -f "$records"' EXIT
+menu="$(mktemp)"
+trap 'rm -f "$records" "$menu"' EXIT
+audio_icon="$HOME/.config/kona/menus/icons/audio.svg"
+device_icon="$HOME/.config/kona/menus/icons/device.svg"
 
-printf 'action\tvolume-down\t  Volume down\n' >> "$records"
-printf 'action\tvolume-up\t  Volume up\n' >> "$records"
-printf 'action\tmute\t󰝟  Toggle output mute\n' >> "$records"
-printf 'action\tmic-mute\t󰍭  Toggle microphone mute\n' >> "$records"
+printf 'action\tvolume-down\tVolume down\t%s\n' "$audio_icon" >> "$records"
+printf 'action\tvolume-up\tVolume up\t%s\n' "$audio_icon" >> "$records"
+printf 'action\tmute\tToggle output mute\t%s\n' "$audio_icon" >> "$records"
+printf 'action\tmic-mute\tToggle microphone mute\t%s\n' "$audio_icon" >> "$records"
 
-pactl -f json list sinks | jq -r --arg current "$default_sink" '.[] | ["sink", .name, ((if .name == $current then "● " else "  " end) + "OUTPUT // " + (.description // .name))] | @tsv' >> "$records"
-pactl -f json list sources | jq -r --arg current "$default_source" '.[] | select(.monitor_source != true) | ["source", .name, ((if .name == $current then "● " else "  " end) + "INPUT  // " + (.description // .name))] | @tsv' >> "$records"
+pactl -f json list sinks | jq -r --arg current "$default_sink" --arg icon "$device_icon" '.[] | ["sink", .name, ((if .name == $current then "● " else "  " end) + "Output · " + (.description // .name)), $icon] | @tsv' >> "$records"
+pactl -f json list sources | jq -r --arg current "$default_source" --arg icon "$device_icon" '.[] | select(.monitor_source != true) | ["source", .name, ((if .name == $current then "● " else "  " end) + "Input · " + (.description // .name)), $icon] | @tsv' >> "$records"
 
-choice="$(cut -f3- "$records" | rofi -dmenu -i -p 'AUDIO // KONA' -theme "$theme")" || exit 0
-[[ -n "$choice" ]] || exit 0
-record="$(awk -F '\t' -v chosen="$choice" '$3 == chosen {print; exit}' "$records")"
+while IFS=$'\t' read -r _kind _value label icon; do
+  printf '%s\0icon\x1f%s\n' "$label" "$icon"
+done < "$records" > "$menu"
+choice="$(rofi -dmenu -i -show-icons -p 'Audio devices' -no-custom -format i -theme "$theme" < "$menu")" || exit 0
+# Rofi returns the original row index even when labels repeat or sorting changes.
+[[ "$choice" =~ ^[0-9]+$ ]] || exit 0
+record="$(awk -v selected_row="$choice" 'NR == selected_row + 1 {print; exit}' "$records")"
+[[ -n "$record" ]] || exit 0
 kind="$(cut -f1 <<< "$record")"
 value="$(cut -f2 <<< "$record")"
 
@@ -37,4 +45,4 @@ case "$kind:$value" in
     "$HOME/.local/bin/kona-osd" message "Microphone changed" audio-input-microphone-symbolic
     ;;
 esac
-
+"$HOME/.local/bin/kona-menu-sound"

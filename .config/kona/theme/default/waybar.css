@@ -1,0 +1,15 @@
+@define-color ink #0B1220;
+@define-color panel rgba(17, 27, 43, 0.94);
+@define-color panel-soft rgba(22, 35, 56, 0.9);
+@define-color line #294263;
+@define-color cyan #7FAEFF;
+@define-color sky #94BCFF;
+@define-color text #EAF2FF;
+@define-color muted #B6C4D9;
+@define-color green #43D5A0;
+@define-color accent-on #0B1220;
+@define-color danger #FF7C88;
+@define-color accent-12 rgba(127, 174, 255, 0.12);
+@define-color accent-22 rgba(127, 174, 255, 0.22);
+@define-color accent-35 rgba(127, 174, 255, 0.35);
+@define-color secondary-line rgba(148, 188, 255, 0.24);

@@ -8,26 +8,39 @@ path_file="$state_root/path"
 start_file="$state_root/started"
 target="$HOME/Videos/Kona Captures"
 mkdir -p "$state_root" "$target"
+exec 9>"$state_root/lock"
+flock -w 10 9 || exit 1
 
 stop_recording() {
   local pid path
   pid="$(cat "$pid_file" 2>/dev/null || true)"
   path="$(cat "$path_file" 2>/dev/null || true)"
-  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+  if [[ "$pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$pid" 2>/dev/null; then
     kill -INT "$pid"
     for _ in {1..50}; do
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.1
     done
+    if kill -0 "$pid" 2>/dev/null; then
+      notify-send -u critical 'Kona Capture' 'Recorder did not stop; recording state was retained.'
+      return 1
+    fi
   fi
-  rm -f "$pid_file" "$path_file" "$start_file"
+  rm -f "$pid_file" "$path_file" "$start_file" "$state_root/birth"
+  "$HOME/.local/bin/kona-waybar-refresh" recording
   "$HOME/.local/bin/kona-osd" message 'Recording saved' media-record-symbolic || true
   [[ -n "$path" ]] && notify-send -a 'Kona Capture' 'Recording saved' "$path"
 }
 
-if [[ -s "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+# Status and the writer use the same PID identity checks; the writer already
+# holds the lock, so its status query must not acquire a second lock.
+if [[ "$("$HOME/.local/bin/kona-record-status" --active-unlocked)" == true ]]; then
   stop_recording
   exit 0
+fi
+if [[ -e "$pid_file" ]]; then
+  rm -f "$pid_file" "$path_file" "$start_file" "$state_root/birth"
+  "$HOME/.local/bin/kona-waybar-refresh" recording
 fi
 
 [[ -x "$recorder" ]] || { notify-send -u critical 'Kona Capture' 'wf-recorder is missing. Run kona-install-deps.'; exit 1; }
@@ -51,12 +64,42 @@ esac
 file="$target/konata-record-$(date +%Y%m%d-%H%M%S).mp4"
 printf '%s\n' "$file" > "$path_file"
 date +%s > "$start_file"
-nohup "$recorder" -a --audio-backend=pipewire -c libx264 -p preset=veryfast -r 60 "${geometry[@]}" -f "$file" >"$state_root/log" 2>&1 &
-printf '%s\n' "$!" > "$pid_file"
+# This child exists only for an active recording. wait receives recorder exit
+# directly, including crashes; no status poll or permanent listener is needed.
+(
+  trap '' HUP
+  pid=''
+  cleanup() {
+    exec 9>"$state_root/lock"
+    flock -w 10 9 || return 1
+    if [[ "$(cat "$pid_file" 2>/dev/null || true)" == "$pid" ]]; then
+      rm -f "$pid_file" "$path_file" "$start_file" "$state_root/birth"
+      "$HOME/.local/bin/kona-waybar-refresh" recording
+    fi
+  }
+  trap cleanup EXIT
+  trap '[[ -z "$pid" ]] || kill -INT "$pid" 2>/dev/null; wait "$pid" || true; exit 143' TERM
+  "$recorder" -a --audio-backend=pipewire -c libx264 -p preset=veryfast -r 60 "${geometry[@]}" -f "$file" 9>&- &
+  pid=$!
+  # /proc start ticks disambiguate PID reuse. Publish pid last, under lock.
+  stat="$(cat "/proc/$pid/stat")"
+  fields="${stat##*) }"
+  read -ra fields <<< "$fields"
+  printf '%s\n' "${fields[19]}" > "$state_root/birth"
+  printf '%s\n' "$pid" > "$pid_file"
+  exec 9>&-
+  "$HOME/.local/bin/kona-waybar-refresh" recording
+  result=0
+  wait "$pid" || result=$?
+  if (( result != 0 )); then
+    notify-send -u critical 'Kona Capture' "Recorder exited with status $result; see $state_root/log"
+  fi
+) >"$state_root/log" 2>&1 </dev/null &
 sleep 0.4
-if ! kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+if [[ ! -s "$pid_file" ]] || ! kill -0 "$(cat "$pid_file")" 2>/dev/null; then
   error="$(tail -n 3 "$state_root/log" 2>/dev/null || true)"
-  rm -f "$pid_file" "$path_file" "$start_file"
+  rm -f "$pid_file" "$path_file" "$start_file" "$state_root/birth"
+  "$HOME/.local/bin/kona-waybar-refresh" recording
   notify-send -u critical 'Kona Capture' "Recording failed: $error"
   exit 1
 fi

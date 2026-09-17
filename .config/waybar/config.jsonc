@@ -1,116 +1,260 @@
-{
-  "layer": "top",
-  "position": "top",
-  "height": 32,
-  "spacing": 5,
-  "margin-top": 6,
-  "margin-left": 8,
-  "margin-right": 8,
-  "reload_style_on_change": true,
-  "modules-left": ["custom/kona", "hyprland/workspaces", "hyprland/window"],
-  "modules-center": ["clock"],
-  "modules-right": ["custom/recording", "custom/gaming", "tray", "network", "pulseaudio", "cpu", "memory", "custom/gpu", "custom/notifications"],
-  "custom/kona": {
-    "format": "",
-    "tooltip": "Applications",
-    "on-click": "rofi -show drun -theme ~/.config/rofi/konata.rasi",
-    "on-click-right": "~/.local/bin/kona-quick-settings"
-  },
-  "hyprland/workspaces": {
-    "active-only": false,
-    "all-outputs": false,
-    "disable-scroll": true,
-    "sort-by-number": true,
-    "persistent-workspaces": {
-      "HDMI-A-1": [1, 4, 7],
-      "DP-4": [2, 5, 8, 10],
-      "HDMI-A-5": [3, 6, 9]
+[
+  {
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "margin-top": 6,
+    "margin-left": 8,
+    "margin-right": 8,
+    "reload_style_on_change": true,
+    "id": "kona-context",
+    "output": "HDMI-A-1",
+    "spacing": 0,
+    "modules-left": [
+      "group/navigation"
+    ],
+    "modules-center": [
+      "group/context"
+    ],
+    "modules-right": [],
+    "group/navigation": {
+      "orientation": "horizontal",
+      "modules": [
+        "ext/workspaces"
+      ]
     },
-    "format": "{name}",
-    "on-click": "activate"
-  },
-  "hyprland/window": {
-    "format": "{title}",
-    "max-length": 42,
-    "separate-outputs": true,
-    "rewrite": {
-      "": "KONATA@ARCH"
-    }
-  },
-  "clock": {
-    "interval": 1,
-    "format": "{:%H:%M:%S}",
-    "format-alt": "{:%A // %B %d // week %V}",
-    "tooltip-format": "<tt><small>{calendar}</small></tt>",
-    "calendar": {
-      "mode": "month",
-      "weeks-pos": "right",
-      "on-scroll": 1,
-      "format": {
-        "months": "<span color='#65dcff'><b>{}</b></span>",
-        "days": "<span color='#b8d9e8'>{}</span>",
-        "weeks": "<span color='#207cdf'>W{}</span>",
-        "weekdays": "<span color='#00c8ff'><b>{}</b></span>",
-        "today": "<span color='#071522' background='#65dcff'><b>{}</b></span>"
+    "group/context": {
+      "orientation": "horizontal",
+      "modules": [
+        "hyprland/window"
+      ]
+    },
+    "hyprland/window": {
+      "format": "{title}",
+      "max-length": 42,
+      "separate-outputs": true,
+      "rewrite": {
+        "": "KONATA@ARCH"
       }
+    },
+    "ext/workspaces": {
+      "format": "{name}",
+      "all-outputs": false,
+      "active-only": false,
+      "ignore-hidden": true,
+      "sort-by-name": false,
+      "sort-by-coordinates": true,
+      "on-click": "activate"
     }
   },
-  "tray": {
-    "icon-size": 15,
-    "spacing": 8
-  },
-  "custom/recording": {
-    "exec": "~/.local/bin/kona-record-status",
-    "return-type": "json",
-    "interval": 1,
-    "on-click": "~/.local/bin/kona-record output"
-  },
-  "custom/gaming": {
-    "exec": "~/.local/bin/kona-game-mode waybar",
-    "return-type": "json",
-    "interval": 2,
-    "on-click": "~/.local/bin/kona-game-mode toggle"
-  },
-  "network": {
-    "format-wifi": "  {essid}",
-    "format-ethernet": "󰈀  {ipaddr}",
-    "format-linked": "󰈀  linked",
-    "format-disconnected": "󰖪  offline",
-    "tooltip-format": "{ifname}\n↓ {bandwidthDownBytes}  ↑ {bandwidthUpBytes}",
-    "on-click": "nm-connection-editor"
-  },
-  "pulseaudio": {
-    "scroll-step": 5,
-    "format": "{icon}  {volume}%",
-    "format-muted": "󰝟  muted",
-    "format-icons": {
-      "headphone": "",
-      "default": ["", "", ""]
+  {
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "margin-top": 6,
+    "margin-left": 8,
+    "margin-right": 8,
+    "reload_style_on_change": true,
+    "id": "kona-command",
+    "output": "DP-4",
+    "spacing": 0,
+    "modules-left": [
+      "group/navigation"
+    ],
+    "modules-center": [
+      "group/time"
+    ],
+    "modules-right": [
+      "group/controls"
+    ],
+    "group/navigation": {
+      "orientation": "horizontal",
+      "modules": [
+        "custom/kona",
+        "ext/workspaces"
+      ]
     },
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-    "on-click-right": "pavucontrol"
+    "custom/kona": {
+      "format": "\uf303  KONA",
+      "tooltip": "Applications",
+      "on-click": "rofi -show drun -theme ~/.config/rofi/konata.rasi",
+      "on-click-right": "~/.local/bin/kona-quick-settings",
+      "tooltip-format": "Applications\nRight click: quick settings"
+    },
+    "group/time": {
+      "orientation": "horizontal",
+      "modules": [
+        "clock"
+      ]
+    },
+    "clock": {
+      "interval": 60,
+      "format": "{:%H:%M}",
+      "format-alt": "{:%A // %B %d // week %V}",
+      "tooltip-format": "<tt><small>{calendar}</small></tt>",
+      "calendar": {
+        "mode": "month",
+        "weeks-pos": "right",
+        "on-scroll": 1,
+        "format": {
+          "months": "<b>{}</b>",
+          "days": "{}",
+          "weeks": "W{}",
+          "weekdays": "<b>{}</b>",
+          "today": "<b><u>{}</u></b>"
+        }
+      }
+    },
+    "group/controls": {
+      "orientation": "horizontal",
+      "modules": [
+        "custom/recording",
+        "custom/gaming",
+        "pulseaudio",
+        "network",
+        "custom/controls"
+      ]
+    },
+    "custom/recording": {
+      "exec": "~/.local/bin/kona-record-status",
+      "return-type": "json",
+      "signal": 8,
+      "exec-on-event": false,
+      "on-click": "~/.local/bin/kona-record output"
+    },
+    "custom/gaming": {
+      "exec": "~/.local/bin/kona-game-mode waybar",
+      "return-type": "json",
+      "signal": 9,
+      "exec-on-event": false,
+      "on-click": "~/.local/bin/kona-game-mode toggle"
+    },
+    "pulseaudio": {
+      "scroll-step": 5,
+      "format": "{icon}  {volume}%",
+      "format-muted": "\udb81\udf5f  muted",
+      "format-icons": {
+        "headphone": "\uf025",
+        "default": [
+          "\uf026",
+          "\uf027",
+          "\uf028"
+        ]
+      },
+      "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+      "on-click-right": "pavucontrol"
+    },
+    "network": {
+      "format-wifi": "\uf1eb  {essid}",
+      "format-ethernet": "\udb80\ude00  LAN",
+      "format-linked": "\udb80\ude00  linked",
+      "format-disconnected": "\udb81\uddaa  offline",
+      "tooltip-format": "{ifname} \u00b7 {ipaddr}\n\u2193 {bandwidthDownBytes}  \u2191 {bandwidthUpBytes}",
+      "on-click": "nm-connection-editor",
+      "max-length": 18
+    },
+    "custom/controls": {
+      "format": "\udb81\udc93",
+      "tooltip-format": "Kona controls\nLeft click: notifications\nRight click: quick settings",
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "~/.local/bin/kona-quick-settings"
+    },
+    "ext/workspaces": {
+      "format": "{name}",
+      "all-outputs": false,
+      "active-only": false,
+      "ignore-hidden": true,
+      "sort-by-name": false,
+      "sort-by-coordinates": true,
+      "on-click": "activate"
+    }
   },
-  "cpu": {
-    "interval": 3,
-    "format": "  {usage}%",
-    "tooltip": true
-  },
-  "memory": {
-    "interval": 3,
-    "format": "  {percentage}%",
-    "tooltip-format": "RAM {used:0.1f} / {total:0.1f} GiB"
-  },
-  "custom/gpu": {
-    "exec": "~/.local/bin/kona-gpu-status",
-    "return-type": "json",
-    "interval": 5,
-    "tooltip": true
-  },
-  "custom/notifications": {
-    "exec": "swaync-client -swb",
-    "return-type": "json",
-    "escape": true,
-    "on-click": "swaync-client -t -sw",
-    "on-click-right": "swaync-client -d -sw"
+  {
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "margin-top": 6,
+    "margin-left": 8,
+    "margin-right": 8,
+    "reload_style_on_change": true,
+    "id": "kona-information",
+    "output": "HDMI-A-5",
+    "spacing": 0,
+    "modules-left": [
+      "group/navigation"
+    ],
+    "modules-center": [
+      "group/hardware"
+    ],
+    "modules-right": [
+      "group/status"
+    ],
+    "group/navigation": {
+      "orientation": "horizontal",
+      "modules": [
+        "ext/workspaces"
+      ]
+    },
+    "group/hardware": {
+      "orientation": "horizontal",
+      "drawer": {
+        "transition-duration": 0,
+        "children-class": "hardware-detail",
+        "transition-left-to-right": true
+      },
+      "modules": [
+        "custom/system",
+        "cpu",
+        "memory",
+        "custom/gpu"
+      ]
+    },
+    "custom/system": {
+      "format": "\uf4bc  SYS",
+      "tooltip-format": "System telemetry \u00b7 hover to expand"
+    },
+    "cpu": {
+      "interval": 3,
+      "format": "CPU {usage}%",
+      "tooltip": true
+    },
+    "memory": {
+      "interval": 3,
+      "format": "RAM {percentage}%",
+      "tooltip-format": "RAM {used:0.1f} / {total:0.1f} GiB"
+    },
+    "custom/gpu": {
+      "exec": "~/.local/bin/kona-gpu-status",
+      "return-type": "json",
+      "interval": 5,
+      "tooltip": true
+    },
+    "group/status": {
+      "orientation": "horizontal",
+      "modules": [
+        "tray",
+        "custom/notifications"
+      ]
+    },
+    "tray": {
+      "icon-size": 15,
+      "spacing": 8
+    },
+    "custom/notifications": {
+      "exec": "swaync-client -swb",
+      "return-type": "json",
+      "escape": true,
+      "on-click": "swaync-client -t -sw",
+      "on-click-right": "swaync-client -d -sw"
+    },
+    "ext/workspaces": {
+      "format": "{name}",
+      "all-outputs": false,
+      "active-only": false,
+      "ignore-hidden": true,
+      "sort-by-name": false,
+      "sort-by-coordinates": true,
+      "on-click": "activate"
+    }
   }
-}
+]

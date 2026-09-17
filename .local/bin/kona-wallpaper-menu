@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wall_root="$HOME/.local/share/wallpapers/konata-command-center"
+thumb_root="${XDG_CACHE_HOME:-$HOME/.cache}/kona/wallpaper-menu-v2"
+menu="$(mktemp)"
+trap 'rm -f -- "$menu"' EXIT
+modes=()
+mkdir -p "$thumb_root"
+current_mode="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/kona-wallpaper-mode" 2>/dev/null || printf animated)"
+
+thumbnail_for() {
+  local mode="$1" source="$2" destination="$thumb_root/$mode.png" temporary
+  if [[ ! -s "$destination" || "$source" -nt "$destination" ]]; then
+    temporary="$(mktemp "$thumb_root/.$mode.XXXXXX.png")"
+    if ffmpeg -hide_banner -loglevel error -y -i "$source" -frames:v 1 \
+      -vf 'scale=480:270:force_original_aspect_ratio=decrease:force_divisible_by=2,format=rgb24' "$temporary"; then
+      mv -f -- "$temporary" "$destination"
+    else
+      rm -f -- "$temporary"
+    fi
+  fi
+  [[ -s "$destination" ]] && printf '%s' "$destination" || printf '%s' "$source"
+}
+
+add_set() {
+  local mode="$1" label="$2" description="$3" preview="$4"
+  shift 4
+  local image
+  for image in "$@"; do [[ -r "$image" && -s "$image" ]] || return 0; done
+  modes+=("$mode")
+  # Keep large/animated source files out of Rofi's UI thread. The cache is
+  # deterministic and rebuilt only when its authoritative source is newer.
+  preview="$(thumbnail_for "$mode" "$preview")"
+  local marker='  '
+  [[ "$mode" != "$current_mode" ]] || marker='● '
+  printf '%s%s · %s\0icon\x1f%s\n' "$marker" "$label" "$description" "$preview" >> "$menu"
+}
+
+add_set simple 'Simple' 'Curated still' "$wall_root/v2/selected.png" "$wall_root/v2/selected.png"
+add_set static 'Static' 'Three-panel panorama' "$wall_root/center.png" \
+  "$wall_root/left.png" "$wall_root/center.png" "$wall_root/right.png"
+add_set animated 'Animated' 'Three-panel motion' "$wall_root/animated/center.webp" \
+  "$wall_root/animated/left.webp" "$wall_root/animated/center.webp" "$wall_root/animated/right.webp"
+
+if (( ${#modes[@]} == 0 )); then
+  notify-send -u critical 'Wallpapers unavailable' 'No complete installed Kona wallpaper set was found.'
+  exit 1
+fi
+choice="$(rofi -dmenu -i -no-custom -no-sort -show-icons -format i \
+  -p 'Wallpapers' -theme "$HOME/.config/rofi/wallpaper.rasi" < "$menu")" || exit 0
+case "$choice" in 0|1|2) ;; *) exit 0 ;; esac
+[[ -v "modes[$choice]" ]] || exit 0
+"$HOME/.local/bin/kona-wallpaper" "${modes[$choice]}"
+"$HOME/.local/bin/kona-menu-sound"

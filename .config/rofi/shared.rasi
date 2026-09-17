@@ -1,0 +1,75 @@
+/* Kona shared transient/menu geometry. Color aliases are generated atomically. */
+@import "../kona/theme/current/rofi.rasi"
+
+* {
+  background-color: transparent;
+  text-color: @fg;
+  font: "Noto Sans 11";
+}
+
+window {
+  width: 620px;
+  location: center;
+  anchor: center;
+  border: 1px;
+  border-color: @outline;
+  border-radius: 14px;
+  background-color: @bg;
+  padding: 14px;
+}
+mainbox { children: [ inputbar, listview, message, textbox-help ]; spacing: 12px; }
+inputbar {
+  children: [ prompt, entry ];
+  background-color: @bg-elevated;
+  border: 1px;
+  border-color: @outline;
+  border-radius: 10px;
+  padding: 11px 12px;
+  spacing: 10px;
+}
+prompt { text-color: @accent-text; font: "Noto Sans Bold 11"; }
+entry { placeholder: "Search…"; placeholder-color: @placeholder-text; }
+listview {
+  columns: 1;
+  lines: 8;
+  fixed-height: false;
+  dynamic: false;
+  cycle: true;
+  scrollbar: true;
+  spacing: 4px;
+}
+scrollbar { width: 3px; handle-width: 3px; handle-color: @outline-strong; }
+element {
+  orientation: horizontal;
+  border: 1px;
+  border-color: transparent;
+  border-radius: 10px;
+  padding: 9px 11px;
+  spacing: 11px;
+}
+element normal.normal,
+element alternate.normal { background-color: transparent; text-color: @fg; }
+element selected.normal,
+element selected.active {
+  background-color: @accent-soft;
+  border-color: @outline-strong;
+  text-color: @fg;
+}
+element normal.active { background-color: @bg-alt; text-color: @fg; }
+element alternate.urgent,
+element normal.urgent { text-color: @danger-text; }
+element selected.urgent {
+  background-color: @bg-pressed;
+  border-color: @danger;
+  text-color: @danger-text;
+}
+element-icon { size: 24px; }
+element-text { text-color: inherit; vertical-align: 0.5; highlight: bold underline; }
+message { background-color: @bg-alt; border-radius: 10px; padding: 10px; }
+textbox-help {
+  expand: false;
+  content: "Enter  Select     Esc  Close";
+  text-color: @muted;
+  font: "JetBrainsMono Nerd Font 9";
+  padding: 5px 2px 0;
+}

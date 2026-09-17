@@ -1,0 +1,7 @@
+@import "shared.rasi"
+
+window { width: 620px; }
+listview { lines: 6; }
+element-icon { enabled: false; }
+entry { placeholder: "Run a command…"; }
+textbox-help { content: "Enter  Run command     Esc  Cancel"; }

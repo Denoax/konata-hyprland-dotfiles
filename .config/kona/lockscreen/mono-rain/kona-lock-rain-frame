@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -eu
+ROOT="${KONA_LOCK_RAIN_DIR:-$HOME/.config/kona/lockscreen/mono-rain/frames}"
+PREFERENCES="${KONA_PREFERENCES:-$HOME/.config/kona/preferences.json}"
+UPDATE_MS=125
+COUNT=80
+
+# Reduced/off motion keeps the decorative layer static. This helper reads only
+# Kona's motion preference and the shipped frames; it never receives key input.
+if [ -r "$PREFERENCES" ]; then
+    preference_json="$(<"$PREFERENCES")"
+    if [[ "$preference_json" =~ \"motion\"[[:space:]]*:[[:space:]]*\"(reduced|off)\" ]]; then
+        exec cat -- "$ROOT/frame-000.txt"
+    fi
+fi
+
+# Bash exposes epoch microseconds without spawning a second helper process.
+epoch_us="${EPOCHREALTIME/./}"
+ms=$((10#$epoch_us / 1000))
+idx=$(((ms / UPDATE_MS) % COUNT))
+printf -v file '%s/frame-%03d.txt' "$ROOT" "$idx"
+exec cat -- "$file"

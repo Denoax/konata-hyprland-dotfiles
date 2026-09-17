@@ -1,0 +1,15 @@
+{
+  "sample_rate": 48000,
+  "channels": 1,
+  "duration_seconds": 0.085,
+  "peak_dbfs": -15.39,
+  "event": "one successful button activation",
+  "never_on": [
+    "hover",
+    "every slider sample",
+    "disabled controls",
+    "global application clicks"
+  ],
+  "origin": "procedurally synthesized original bubble-like nonverbal click",
+  "audition_status": "not user-approved"
+}

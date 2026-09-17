@@ -1,0 +1,35 @@
+{
+  "duration_seconds": 10,
+  "fps": 10,
+  "frame_count": 100,
+  "outputs": {
+    "konata-mono-rain-static.png": {
+      "bytes": 2294766,
+      "sha256": "b2f6e31975d5eca1c11db6a9f64461ecedbb6007442df3606db13463176bd875"
+    },
+    "konata-mono-rain.gif": {
+      "bytes": 6653332,
+      "sha256": "3ff64076b998600e21cfbe79a9997d3c6cb03d5ad4d0f62f5a3b92f766af277c"
+    },
+    "konata-mono-rain.mp4": {
+      "bytes": 1648970,
+      "sha256": "a126fac8edb6c92ee7b22a90decc29f8fb8ca998877de336410a4aa65e86d068"
+    },
+    "konata-mono-rain.webp": {
+      "bytes": 2240600,
+      "sha256": "187c220af33906ed638c22e296f9697f914e6212f95978788cf9d28498740e8d"
+    }
+  },
+  "runtime_stable_region": {
+    "format": "gif-rgb24",
+    "sha256": "0544ede31e2434823498872b8ecd8054e0bc476b24b1e6be42131e57c5c99f14"
+  },
+  "schema": 1,
+  "seam_endpoint_exact": true,
+  "source_sha256": "aab2a5e05dfb89163beed608b46052b219dfe14a638a94edf89d77d1dd4fa73c",
+  "stable_region": {
+    "sha256": "44ccb9bbe1a652fa38e58def614876bb2c121dd0f9c15c0e0a5f07330e4d8d00",
+    "width": 1220,
+    "x": 700
+  }
+}

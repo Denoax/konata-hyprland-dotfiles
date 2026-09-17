@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+records="$(mktemp)"
+menu="$(mktemp)"
+trap 'rm -f -- "$records" "$menu"' EXIT
+icons="$HOME/.config/kona/menus/icons"
+wifi="$(nmcli -t -f WIFI general 2>/dev/null || printf unavailable)"
+active="$(nmcli -t -f UUID connection show --active 2>/dev/null | head -n1 || true)"
+
+printf 'toggle\twifi\tWi-Fi · %s\t%s/wifi.svg\n' "$wifi" "$icons" >> "$records"
+printf 'editor\topen\tNetwork settings\t%s/settings.svg\n' "$icons" >> "$records"
+while IFS=$'\t' read -r uuid name type; do
+  [[ -n "$uuid" && -n "$name" ]] || continue
+  marker='  '
+  [[ "$uuid" != "$active" ]] || marker='● '
+  printf 'connection\t%s\t%s%s · %s\t%s/wifi.svg\n' "$uuid" "$marker" "$name" "$type" "$icons" >> "$records"
+done < <(nmcli -t --escape yes -f UUID,NAME,TYPE connection show 2>/dev/null | python3 -c '
+import sys
+for raw in sys.stdin:
+    fields, value, escaped = [], [], False
+    for char in raw.rstrip("\n"):
+        if escaped:
+            value.append(char); escaped = False
+        elif char == "\\": escaped = True
+        elif char == ":": fields.append("".join(value)); value = []
+        else: value.append(char)
+    if escaped: value.append("\\")
+    fields.append("".join(value))
+    if len(fields) == 3 and fields[2] in ("802-11-wireless", "802-3-ethernet"):
+        print("\t".join((fields[0], fields[1].replace("\t", " "), fields[2])))
+')
+
+if [[ "${1:-}" == --check ]]; then
+  printf 'wifi=%s active=%s saved_connections=%s\n' "$wifi" "${active:-none}" "$(awk -F '\t' '$1=="connection"{n++} END{print n+0}' "$records")"
+  exit 0
+fi
+
+set +e
+while IFS=$'\t' read -r _kind _value label icon; do
+  printf '%s\0icon\x1f%s\n' "$label" "$icon"
+done < "$records" > "$menu"
+choice="$(rofi -dmenu -i -show-icons -no-custom -no-sort -format i -p 'Network' \
+  -theme "$HOME/.config/rofi/network.rasi" < "$menu")"
+status=$?
+set -e
+[[ $status -eq 0 && "$choice" =~ ^[0-9]+$ ]] || exit 0
+record="$(awk -F '\t' -v n="$((choice + 1))" 'NR==n{print;exit}' "$records")"
+kind="$(cut -f1 <<< "$record")"; value="$(cut -f2 <<< "$record")"
+case "$kind" in
+  toggle)
+    if [[ "$wifi" == enabled ]]; then nmcli radio wifi off; else nmcli radio wifi on; fi
+    "$HOME/.local/bin/kona-menu-sound"
+    ;;
+  editor)
+    "$HOME/.local/bin/kona-menu-sound"
+    uwsm app -- nm-connection-editor >/dev/null 2>&1 &
+    ;;
+  connection)
+    nmcli connection up uuid "$value"
+    "$HOME/.local/bin/kona-menu-sound"
+    ;;
+esac

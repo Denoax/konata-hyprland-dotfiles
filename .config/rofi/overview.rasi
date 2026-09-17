@@ -1,0 +1,9 @@
+@import "shared.rasi"
+
+window { width: 760px; height: 900px; }
+listview { columns: 2; lines: 5; fixed-height: true; dynamic: true; scrollbar: false; spacing: 8px; }
+element { orientation: vertical; padding: 8px; spacing: 8px; }
+element-icon { size: 100px; }
+element-text { horizontal-align: 0.5; }
+entry { placeholder: "Find a workspace…"; }
+textbox-help { content: "Enter  Open workspace     Esc  Cancel"; }

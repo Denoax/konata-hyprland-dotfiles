@@ -1,0 +1,13 @@
+{
+  "instant": 70,
+  "effect.fast": 140,
+  "effect.default": 200,
+  "effect.slow": 280,
+  "spatial.fast": 260,
+  "spatial.default": 380,
+  "spatial.hero": 520,
+  "workspace.distance": 22,
+  "spring.mass": 1,
+  "spring.stiffness": 400,
+  "spring.damping": 40
+}

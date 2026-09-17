@@ -1,0 +1,25 @@
+{
+  "radius_surface": 14,
+  "radius_card": 12,
+  "radius_control": 10,
+  "radius_small": 8,
+  "outline_px": 1,
+  "padding_surface": 14,
+  "padding_card": 12,
+  "row_height": 44,
+  "button_height": 36,
+  "icon_px": 18,
+  "compact_icon_px": 16,
+  "shadow_blur": 22,
+  "surface_max_width": {
+    "notification": 430,
+    "alt_tab": 660,
+    "launcher": 620,
+    "command_center": 520,
+    "clipboard": 620,
+    "audio": 520,
+    "power": 420,
+    "profile": 440,
+    "wallpaper": 760
+  }
+}

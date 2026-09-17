@@ -1,0 +1,20 @@
+{
+  "bg.0": "#061322",
+  "bg.1": "#07182a",
+  "bg.2": "#0b2c4a",
+  "bg.translucent": "#051424f0",
+  "text.primary": "#d9f7ff",
+  "text.secondary": "#7ba7bd",
+  "text.disabled": "#59879e",
+  "accent.primary": "#00c8ff",
+  "accent.secondary": "#65dcff",
+  "accent.on": "#061322",
+  "accent.border": "#207cdf",
+  "line.subtle": "#00c8ff75",
+  "line.active": "#00c8ff",
+  "state.success": "#56e39f",
+  "state.warning": "#f5cf65",
+  "state.danger": "#ff5d78",
+  "shadow.soft": "#00000033",
+  "glow.active": "#00c8ff59"
+}

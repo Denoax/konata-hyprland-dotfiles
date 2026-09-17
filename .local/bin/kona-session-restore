@@ -10,6 +10,10 @@ if [[ "${1:-}" == "--startup" && ! -f "$enabled_file" ]]; then
 fi
 [[ -s "$session_file" ]] || exit 0
 
+# Keep event saves from replacing the startup snapshot during restoration.
+exec 9>"$state_root/session.lock"
+flock -w 10 9 || exit 1
+
 restored=0
 while IFS=$'\t' read -r class workspace command_json floating fullscreen x y width height; do
   if hyprctl clients -j | jq -e --arg class "$class" 'any(.[]; (.class | ascii_downcase) == ($class | ascii_downcase))' >/dev/null; then
@@ -17,7 +21,7 @@ while IFS=$'\t' read -r class workspace command_json floating fullscreen x y wid
   fi
 
   mapfile -t command < <(jq -r '.[]' <<< "$command_json")
-  uwsm app -- "${command[@]}" >/dev/null 2>&1 &
+  uwsm app -- "${command[@]}" 9>&- >/dev/null 2>&1 &
   address=''
   for _ in {1..80}; do
     address="$(hyprctl clients -j | jq -r --arg class "$class" '.[] | select((.class | ascii_downcase) == ($class | ascii_downcase)) | .address' | tail -n1)"
@@ -42,6 +46,9 @@ done < <(jq -r '.[] | [
   ((.x // 0)|tostring), ((.y // 0)|tostring),
   ((.width // 900)|tostring), ((.height // 650)|tostring)
 ] | @tsv' "$session_file")
+
+flock -u 9
+"$HOME/.local/bin/kona-session-save" --quiet
 
 if [[ "${1:-}" != "--startup" ]]; then
   notify-send -a 'Kona Session' 'Session restored' "$restored apps reopened."

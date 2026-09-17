@@ -1,0 +1,7 @@
+@import "shared.rasi"
+
+window { width: 520px; height: 420px; }
+listview { lines: 8; }
+element-icon { enabled: true; size: 20px; }
+entry { placeholder: "Filter connections…"; }
+textbox-help { content: "Enter  Activate     Esc  Cancel"; }

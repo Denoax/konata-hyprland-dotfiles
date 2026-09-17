@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme="$HOME/.config/rofi/konata.rasi"
+theme="$HOME/.config/rofi/audio.rasi"
 records="$(mktemp)"
 trap 'rm -f "$records"' EXIT
 
@@ -10,7 +10,7 @@ pactl -f json list sink-inputs | jq -r '
   (.properties["application.name"] // .properties["media.name"] // "Unknown app") as $name |
   (.volume | to_entries[0].value.value_percent // "?") as $volume |
   [(.index|tostring), $name,
-   ("" + (if .mute then "󰝟" else "" end) + "  " + $name + "  //  " + $volume)] |
+   ("" + (if .mute then "󰝟" else "" end) + "  " + $name + "  ·  " + $volume)] |
   @tsv
 ' > "$records"
 
@@ -25,8 +25,11 @@ if [[ "${1:-}" == "--check" ]]; then
   exit 0
 fi
 
-choice="$(cut -f3- "$records" | rofi -dmenu -i -p 'APP MIXER // KONA' -theme "$theme")" || exit 0
-record="$(awk -F '\t' -v chosen="$choice" '$3 == chosen {print; exit}' "$records")"
+choice="$(cut -f3- "$records" | rofi -dmenu -i -p 'App mixer' -no-custom -format i -theme "$theme")" || exit 0
+# Rofi returns the original row index even when labels repeat or sorting changes.
+[[ "$choice" =~ ^[0-9]+$ ]] || exit 0
+record="$(awk -v selected_row="$choice" 'NR == selected_row + 1 {print; exit}' "$records")"
+[[ -n "$record" ]] || exit 0
 index="$(cut -f1 <<< "$record")"
 name="$(cut -f2 <<< "$record")"
 [[ -n "$index" ]] || exit 0
@@ -42,3 +45,4 @@ case "$action" in
   *) exit 0 ;;
 esac
 "$HOME/.local/bin/kona-osd" message "$name audio updated" audio-volume-high-symbolic || true
+"$HOME/.local/bin/kona-menu-sound"

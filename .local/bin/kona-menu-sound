@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ "${KONA_MENU_SOUND_DISABLE:-0}" != 1 ]] || exit 0
+
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="${XDG_STATE_HOME:-$HOME/.local/state}"
+profile_file="$state/kona/profile.json"
+sound="$HOME/.config/kona/menus/bubble-click.wav"
+
+[[ -r "$sound" ]] || exit 0
+if [[ -r "$profile_file" ]]; then
+  profile="$(jq -r '.profile // empty' "$profile_file" 2>/dev/null || true)"
+  [[ "$profile" != focus && "$profile" != gaming ]] || exit 0
+fi
+[[ ! -e "$runtime/kona-game-mode" ]] || exit 0
+if [[ -s "$runtime/kona-record/pid" ]]; then
+  read -r recorder_pid < "$runtime/kona-record/pid" || true
+  [[ ! "$recorder_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$recorder_pid" 2>/dev/null || exit 0
+fi
+
+# One short-lived player per accepted action. The nonblocking lock collapses
+# accidental double activation without creating a resident sound owner.
+(
+  flock -n 9 || exit 0
+  pw-play --volume 0.28 "$sound" >/dev/null 2>&1
+) 9>"$runtime/kona-menu-sound.lock" &

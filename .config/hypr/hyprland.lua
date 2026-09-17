@@ -8,6 +8,138 @@ local browser = "gtk-launch com.brave.Browser"
 local mainMod = "SUPER"
 local superTapArmed = false
 
+-- Event/state foundation (Hyprland 0.56.2). Callbacks only arm native timers;
+-- external workers own IPC, filesystem writes and locking. A oneshot expires
+-- after firing, so rearm it only while pending and create a new one next burst.
+local sessionTimer = nil
+local sessionDelay = 30000 -- Preserve the startup restore grace period.
+local captureTimers = {}
+local windowWorkspaces = {}
+local windowFloating = {}
+
+local function saveSessionSoon()
+    if sessionTimer then
+        sessionTimer:set_timeout(sessionDelay)
+        return
+    end
+    sessionTimer = hl.timer(function()
+        sessionTimer = nil
+        sessionDelay = 1500
+        hl.exec_cmd("~/.local/bin/kona-session-save --quiet")
+    end, { timeout = sessionDelay, type = "oneshot" })
+end
+
+local function captureWorkspaceSoon(id)
+    if not id or id < 1 or id > 10 then return end
+    if captureTimers[id] then
+        captureTimers[id]:set_timeout(1200)
+        return
+    end
+    captureTimers[id] = hl.timer(function()
+        captureTimers[id] = nil
+        hl.exec_cmd("~/.local/bin/kona-workspace-capture " .. id)
+    end, { timeout = 1200, type = "oneshot" })
+end
+
+local function visibleWorkspace(window)
+    local workspace = window.workspace
+    if workspace and workspace.id > 0 then return workspace.id end
+    local monitor = window.monitor
+    return monitor and monitor.active_workspace and monitor.active_workspace.id
+end
+
+local function windowChanged(window)
+    -- Unmap can emit fullscreen/rule updates after close. Only open (or the
+    -- initial seed) may establish ownership; late events must not recreate it.
+    if window and windowFloating[window.address] == nil then return end
+    saveSessionSoon()
+    if not window then return end
+    local id = visibleWorkspace(window)
+    captureWorkspaceSoon(windowWorkspaces[window.address])
+    captureWorkspaceSoon(id)
+    windowWorkspaces[window.address] = id
+    windowFloating[window.address] = window.floating
+end
+
+-- Seed old workspace ownership once, outside callbacks (needed on reload).
+for _, window in ipairs(hl.get_windows()) do
+    windowWorkspaces[window.address] = visibleWorkspace(window)
+    windowFloating[window.address] = window.floating
+end
+hl.on("window.open", function(window)
+    windowFloating[window.address] = window.floating
+    windowChanged(window)
+end)
+hl.on("window.move_to_workspace", windowChanged)
+hl.on("window.fullscreen", windowChanged)
+hl.on("window.close", function(window)
+    windowChanged(window)
+    windowWorkspaces[window.address] = nil
+    windowFloating[window.address] = nil
+end)
+hl.on("window.update_rules", function(window)
+    -- Rules also update for focus/title changes; only floating changes matter.
+    if windowFloating[window.address] ~= window.floating then windowChanged(window) end
+end)
+-- No geometry event in this ABI. Focus transitions provide a conservative save
+-- fallback for out-of-band geometry changes, without triggering screenshots.
+hl.on("window.active", saveSessionSoon)
+hl.on("workspace.active", function(workspace)
+    saveSessionSoon()
+    if workspace then captureWorkspaceSoon(workspace.id) end
+end)
+hl.on("workspace.special_active", function(_, monitor)
+    saveSessionSoon()
+    if monitor and monitor.active_workspace then captureWorkspaceSoon(monitor.active_workspace.id) end
+end)
+local topologyTimer = nil
+local function topologyChanged()
+    saveSessionSoon()
+    if topologyTimer then topologyTimer:set_timeout(1200); return end
+    topologyTimer = hl.timer(function()
+        topologyTimer = nil
+        for _, monitor in ipairs(hl.get_monitors()) do
+            if monitor.active_workspace then captureWorkspaceSoon(monitor.active_workspace.id) end
+        end
+    end, { timeout = 1200, type = "oneshot" })
+end
+hl.on("monitor.layout_changed", topologyChanged)
+hl.on("config.reloaded", function()
+    -- --verify-config also emits this event, with no live event loop/monitors.
+    if #hl.get_monitors() == 0 then return end
+    topologyChanged()
+    hl.exec_cmd("~/.local/bin/kona-game-mode reconcile")
+end)
+hl.on("hyprland.shutdown", function()
+    -- Best effort: failed IPC preserves the last valid snapshot in the worker.
+    hl.exec_cmd("~/.local/bin/kona-session-save --quiet")
+    -- Plain Hyprland has no graphical-session target. Stop the packaged agent
+    -- before its Wayland connection breaks; the unit readiness gate also covers
+    -- compositor crashes where this orderly callback cannot run.
+    hl.exec_cmd("systemctl --user stop hyprpolkitagent.service")
+end)
+
+-- Observe geometry at mouse press/release without consuming input or adding a
+-- timer that polls during drags. Covers border resizing as well as Kona drags.
+local mouseGeometry = {}
+local function geometry(window)
+    if not window then return nil end
+    local at, size = window.at, window.size
+    return table.concat({ window.address, at.x, at.y, size.x, size.y, tostring(window.floating) }, ":")
+end
+for _, button in ipairs({ "mouse:272", "mouse:273" }) do
+    hl.bind(button, function()
+        local window = hl.get_active_window()
+        mouseGeometry[button] = window and { address = window.address, value = geometry(window) }
+    end, { transparent = true, non_consuming = true, ignore_mods = true, dont_inhibit = true })
+    hl.bind(button, function()
+        local window = hl.get_active_window()
+        local before = mouseGeometry[button]
+        if before and window and before.address == window.address and before.value ~= geometry(window) then windowChanged(window) end
+        mouseGeometry[button] = nil
+    end, { release = true, transparent = true, non_consuming = true, ignore_mods = true, dont_inhibit = true })
+end
+
 -- Preserve Windows-key chords while allowing a tap of Windows/Super alone.
 local function bindSuper(keys, dispatcher, flags)
     local combo = mainMod .. " + " .. keys
@@ -59,6 +191,18 @@ hl.workspace_rule({ workspace = "8", monitor = "DP-4", persistent = true })
 hl.workspace_rule({ workspace = "9", monitor = "HDMI-A-5", persistent = true })
 hl.workspace_rule({ workspace = "10", monitor = "DP-4", persistent = true })
 
+-- Theme data is two bounded RGB lines, never executable generated Lua. Missing or
+-- corrupt data retains the accepted cyan borders, including during clean recovery.
+local themePrimary, themeSecondary = "00c8ff", "207cdf"
+local themeRoot = (os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")) .. "/kona/theme/current/hyprland.colors"
+local themeFile = io.open(themeRoot, "r")
+if themeFile then
+    local data = themeFile:read(15) or ""
+    themeFile:close()
+    local a, b = data:match("^(%x%x%x%x%x%x)\n(%x%x%x%x%x%x)\n$")
+    if a and b then themePrimary, themeSecondary = a, b end
+end
+
 hl.config({
     general = {
         gaps_in = 6,
@@ -67,7 +211,7 @@ hl.config({
         extend_border_grab_area = 10,
         hover_icon_on_border = true,
         col = {
-            active_border = { colors = { "rgba(00c8ffff)", "rgba(207cdfff)" }, angle = 45 },
+            active_border = { colors = { "rgba(" .. themePrimary .. "ff)", "rgba(" .. themeSecondary .. "ff)" }, angle = 45 },
             inactive_border = "rgba(16486daa)",
         },
         resize_on_border = true,
@@ -112,7 +256,7 @@ hl.config({
         merge_groups_on_groupbar = true,
         merge_floated_into_tiled_on_groupbar = true,
         col = {
-            border_active = "rgba(00c8ffff)",
+            border_active = "rgba(" .. themePrimary .. "ff)",
             border_inactive = "rgba(16486daa)",
         },
         groupbar = {
@@ -143,34 +287,28 @@ hl.config({
     },
 })
 
-hl.curve("konaEase", { type = "bezier", points = { { 0.22, 1 }, { 0.36, 1 } } })
-hl.curve("konaQuick", { type = "bezier", points = { { 0.15, 0 }, { 0.10, 1 } } })
-hl.animation({ leaf = "global", enabled = true, speed = 8, bezier = "konaEase" })
-hl.animation({ leaf = "windows", enabled = true, speed = 5, bezier = "konaEase" })
-hl.animation({ leaf = "windowsIn", enabled = true, speed = 4, bezier = "konaEase", style = "popin 92%" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 4, bezier = "konaQuick", style = "popin 92%" })
-hl.animation({ leaf = "fade", enabled = true, speed = 4, bezier = "konaQuick" })
-hl.animation({ leaf = "layers", enabled = true, speed = 5, bezier = "konaEase" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "konaEase", style = "slide" })
+-- Generated default translation of .config/kona/motion.json; user/profile
+-- overrides are applied by the transient kona-motion owner on reconciliation.
+hl.curve("konaSpatial", {type="spring",mass=1,stiffness=400,dampening=40})
+hl.curve("konaEffect", {type="bezier",points={{0.22,1},{0.36,1}}})
+hl.animation({leaf="global",enabled=true,speed=3.800,spring="konaSpatial"})
+hl.animation({leaf="windows",enabled=true,speed=2.600,spring="konaSpatial"})
+hl.animation({leaf="windowsIn",enabled=true,speed=2.600,spring="konaSpatial",style="popin 97%"})
+hl.animation({leaf="windowsOut",enabled=true,speed=2.000,bezier="konaEffect",style="popin 98%"})
+hl.animation({leaf="fade",enabled=true,speed=1.400,bezier="konaEffect"})
+hl.animation({leaf="layers",enabled=true,speed=2.600,bezier="konaEffect"})
+hl.animation({leaf="workspaces",enabled=true,speed=3.800,spring="konaSpatial",style="slidefade 22%"})
+hl.animation({leaf="borderangle",enabled=false})
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
 hl.on("hyprland.start", function()
-    hl.exec_cmd("~/.local/bin/kona-wallpaper restore")
-    hl.exec_cmd("hypridle")
-    hl.exec_cmd("waybar")
-    hl.exec_cmd("~/.local/bin/kona-dock")
-    hl.exec_cmd("systemctl --user start hyprpolkitagent")
-    hl.exec_cmd("nm-applet --indicator")
-    hl.exec_cmd("blueman-applet")
-    hl.exec_cmd("udiskie --tray")
-    hl.exec_cmd("wl-paste --type text --watch cliphist store")
-    hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    hl.exec_cmd("~/.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-server --config ~/.config/swayosd/config.toml --style ~/.config/swayosd/style.css")
+    hl.exec_cmd("~/.local/bin/kona-runtime-start")
+    hl.exec_cmd("~/.local/bin/kona-profile startup")
+    hl.exec_cmd("~/.local/bin/kona-sidebar show")
     hl.exec_cmd("~/.local/bin/kona-night-light startup")
     hl.exec_cmd("bash -lc 'sleep 2; ~/.local/bin/kona-session-restore --startup'")
-    hl.exec_cmd("~/.local/bin/kona-session-daemon")
-    hl.exec_cmd("~/.local/bin/kona-workspace-history-daemon")
+    hl.exec_cmd("~/.local/bin/kona-session-save --initialize")
 end)
 
 -- Core application controls.
@@ -180,7 +318,7 @@ end, { transparent = true, non_consuming = true })
 hl.bind("SUPER + SUPER_L", function()
     if superTapArmed then
         superTapArmed = false
-        hl.dispatch(hl.dsp.exec_cmd("nwg-dock-hyprland"))
+        hl.dispatch(hl.dsp.exec_cmd("~/.local/bin/kona-sidebar toggle"))
     end
 end, { release = true, transparent = true })
 
@@ -191,15 +329,18 @@ bindSuper("E", hl.dsp.exec_cmd(fileManager))
 bindSuper("B", hl.dsp.exec_cmd(browser))
 bindSuper("Q", hl.dsp.window.close())
 bindSuper("F", hl.dsp.window.fullscreen())
-bindSuper("SHIFT + SPACE", hl.dsp.window.float({ action = "toggle" }))
+bindSuper("SHIFT + SPACE", function()
+    hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+    windowChanged(hl.get_active_window())
+end)
 bindSuper("P", hl.dsp.window.pseudo())
 bindSuper("J", hl.dsp.layout("togglesplit"))
 
 -- Windows-style desktop controls.
 hl.bind("ALT + F4", hl.dsp.window.close())
-hl.bind("ALT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/konata.rasi"))
-hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/konata.rasi"))
-bindSuper("R", hl.dsp.exec_cmd("rofi -show run -theme ~/.config/rofi/konata.rasi"))
+hl.bind("ALT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
+hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
+bindSuper("R", hl.dsp.exec_cmd("rofi -show run -theme ~/.config/rofi/run.rasi"))
 bindSuper("L", hl.dsp.exec_cmd("hyprlock"))
 bindSuper("D", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
 bindSuper("M", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
@@ -224,12 +365,19 @@ bindSuper("SHIFT + H", function()
     hl.dispatch(hl.dsp.window.clear_tags({ window = window }))
     hl.dispatch(hl.dsp.focus({ window = window }))
 end)
-bindSuper("TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/konata.rasi"))
+bindSuper("TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
 bindSuper("I", hl.dsp.exec_cmd("systemsettings"))
 bindSuper("A", hl.dsp.exec_cmd("swaync-client -t -sw"))
 bindSuper("SHIFT + A", hl.dsp.exec_cmd("~/.local/bin/kona-audio-menu"))
 bindSuper("CTRL + A", hl.dsp.exec_cmd("~/.local/bin/kona-app-mixer"))
 bindSuper("W", hl.dsp.exec_cmd("~/.local/bin/kona-overview"))
+bindSuper("CTRL + P", hl.dsp.exec_cmd("~/.local/bin/kona-profile-menu"))
+-- Keep the legacy Deck chord as a compatibility route to the single SwayNC owner.
+bindSuper("CTRL + SPACE", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
+bindSuper("CTRL + I", hl.dsp.exec_cmd("~/.local/bin/kona-shell studio"))
+bindSuper("F1", hl.dsp.exec_cmd("~/.local/bin/kona-shell shortcuts"))
+bindSuper("CTRL + M", hl.dsp.exec_cmd("~/.local/bin/kona-shell mosaic"))
+bindSuper("SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/kona-wallpaper-menu"))
 bindSuper("C", hl.dsp.exec_cmd("~/.local/bin/kona-quick-settings"))
 bindSuper("G", hl.dsp.exec_cmd("~/.local/bin/kona-game-mode toggle"))
 bindSuper("U", hl.dsp.exec_cmd("~/.local/bin/kona-updates"))

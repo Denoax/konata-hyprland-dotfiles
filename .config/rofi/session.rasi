@@ -1,0 +1,8 @@
+@import "shared.rasi"
+
+window { width: 420px; height: 360px; }
+listview { lines: 4; scrollbar: false; }
+element { padding: 12px; }
+element-icon { enabled: true; size: 20px; }
+entry { placeholder: "Choose a session action…"; }
+textbox-help { content: "Power actions require confirmation"; }

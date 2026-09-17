@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kona Music
+Comment=Music playback and audio output
+Exec=kona-music-popup
+Icon=audio-x-generic
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=music;media;player;Kona;

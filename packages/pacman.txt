@@ -35,6 +35,7 @@ linux
 linux-firmware
 man-db
 man-pages
+matugen
 mkinitcpio
 nano
 networkmanager
@@ -47,6 +48,7 @@ papirus-icon-theme
 pavucontrol
 plasma-meta
 playerctl
+python
 rofi
 rsync
 slurp
@@ -69,3 +71,9 @@ xdg-desktop-portal-hyprland
 xdg-utils
 zip
 zram-generator
+
+# Optional, on-demand Kona V4 Deck / Studio (never autostarted)
+quickshell
+
+# Unicode track metadata in the music popup (no font binaries in the repository).
+noto-fonts-cjk

@@ -3,10 +3,24 @@ set -euo pipefail
 
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/kona"
 session_file="$state_root/session.json"
-temporary="$session_file.tmp"
 mkdir -p "$state_root"
+case "${1:-}" in
+  --initialize) touch "$state_root/session-restore-enabled"; exit 0 ;;
+  ''|--quiet) ;;
+  *) printf 'usage: %s [--quiet|--initialize]\n' "$0" >&2; exit 2 ;;
+esac
 
-hyprctl clients -j | jq '
+# Manual, event and restore workers share this lock. Failed queries preserve
+# the last usable session; identical snapshots do not churn storage.
+exec 9>"$state_root/session.lock"
+flock -w 10 9 || exit 1
+temporary="$(mktemp "$state_root/.session.XXXXXX")"
+trap 'rm -f "$temporary"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+timeout 5 hyprctl clients -j | jq -e '
+  if type != "array" then error("Hyprland clients response is not an array") else . end |
   def command_for:
     (.class | ascii_downcase) as $class |
     if $class == "brave-browser" then ["flatpak", "run", "com.brave.Browser"]
@@ -37,7 +51,9 @@ hyprctl clients -j | jq '
   unique_by(.class)
 ' > "$temporary"
 
-mv "$temporary" "$session_file"
+if ! cmp -s "$temporary" "$session_file"; then
+  mv "$temporary" "$session_file"
+fi
 if [[ "${1:-}" != "--quiet" ]]; then
   count="$(jq 'length' "$session_file")"
   notify-send -a 'Kona Session' 'Session saved' "$count restorable apps remembered."

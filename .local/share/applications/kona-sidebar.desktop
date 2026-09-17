@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Kona Sidebar
+Comment=Review the Kona sidebar foundation
+Exec=kona-sidebar show
+Icon=view-sidetree
+Terminal=false
+Categories=Utility;

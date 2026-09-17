@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kona Shortcuts
+Comment=Kona V4 — Shortcuts
+Exec=kona-shell shortcuts
+Icon=help-browser
+Terminal=false
+Categories=Settings;Utility;
+Keywords=Kona;Desktop;Customization;

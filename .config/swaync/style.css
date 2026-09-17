@@ -1,116 +1,166 @@
+/* Kona transient-surface geometry; semantic colors are generated atomically. */
+@import url("../kona/theme/current/swaync.css");
 :root {
-  --cc-bg: rgba(5, 20, 36, 0.94);
-  --noti-border-color: rgba(0, 200, 255, 0.40);
-  --noti-bg: 8, 29, 50;
-  --noti-bg-alpha: 0.92;
-  --noti-bg-darker: rgb(6, 19, 34);
-  --noti-bg-hover: rgb(13, 51, 83);
-  --noti-bg-focus: rgba(18, 98, 154, 0.42);
-  --noti-close-bg: rgba(0, 200, 255, 0.12);
-  --noti-close-bg-hover: rgba(0, 200, 255, 0.30);
-  --text-color: rgb(217, 247, 255);
-  --text-color-disabled: rgb(89, 135, 158);
-  --bg-selected: rgb(0, 200, 255);
-  --notification-icon-size: 52px;
+  --notification-icon-size: 44px;
   --notification-app-icon-size: 18px;
-  --notification-group-icon-size: 28px;
-  --border: 1px solid var(--noti-border-color);
-  --border-radius: 8px;
-  --notification-shadow: 0 0 18px rgba(0, 174, 230, 0.14);
+  --notification-group-icon-size: 24px;
+  --border-radius: 12px;
   --font-size-body: 13px;
   --font-size-summary: 14px;
+  --mpris-album-art-icon-size: 64px;
+  --mpris-album-art-shadow: none;
 }
 
 * {
-  font-family: "JetBrainsMono Nerd Font";
+  font-family: "Noto Sans", "JetBrainsMono Nerd Font";
+  color: @kona_fg;
 }
 
-notificationwindow,
-blankwindow {
-  background: transparent;
-}
+notificationwindow, blankwindow { background: transparent; }
 
 .control-center {
-  background: var(--cc-bg);
-  border: 1px solid var(--noti-border-color);
-  border-radius: 8px;
-  box-shadow: 0 0 24px rgba(0, 174, 230, 0.18);
-  padding: 8px;
+  background: alpha(@kona_surface, 0.97);
+  border: 1px solid @kona_outline;
+  border-radius: 14px;
+  box-shadow: 0 12px 36px @kona_shadow;
+  padding: 14px;
 }
 
-.notification-row {
-  outline: none;
-  background: transparent;
-}
-
-.notification-row .notification-background {
-  padding: 5px 7px;
-}
-
-.notification-row .notification-background .notification {
-  background: rgba(var(--noti-bg), var(--noti-bg-alpha));
-  border: var(--border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--notification-shadow);
-}
-
-.notification-row .notification-background .notification.critical {
-  border-color: #ff7891;
-}
-
-.notification-row .notification-background .notification .notification-default-action {
-  color: var(--text-color);
+.control-center .widget {
   background: transparent;
   border: none;
-  border-radius: var(--border-radius);
-  padding: 5px;
-}
-
-.notification-row .notification-background .notification .notification-default-action:hover {
-  background: var(--noti-bg-hover);
-}
-
-.close-button {
-  color: var(--text-color);
-  background: var(--noti-close-bg);
-  border: none;
-  border-radius: 100%;
-  box-shadow: none;
-  min-width: 22px;
-  min-height: 22px;
-  margin: 7px;
+  margin: 0 0 12px;
   padding: 0;
 }
 
-.close-button:hover {
-  background: var(--noti-close-bg-hover);
-}
-
-.widget-title,
-.widget-dnd,
-.widget-volume,
-.widget-buttons-grid,
-.widget-mpris {
-  color: var(--text-color);
-  background: rgba(11, 44, 74, 0.76);
-  border: 1px solid rgba(0, 200, 255, 0.20);
-  border-radius: 6px;
-  margin: 5px;
-  padding: 9px;
-}
-
+.widget-title > label { font-size: 13px; font-weight: 700; }
+.widget-title.identity { margin: 4px 2px 14px; }
+.widget-title.identity > label { font-size: 20px; font-weight: 700; }
 .widget-title > button,
-.widget-dnd > switch,
-.widget-buttons-grid > flowbox > flowboxchild > button {
-  color: #65dcff;
-  background: rgba(0, 200, 255, 0.08);
-  border: 1px solid rgba(0, 200, 255, 0.24);
-  border-radius: 5px;
+.widget-menubar button {
+  color: @kona_muted;
+  background: @kona_surface_elevated;
+  border: 1px solid @kona_outline;
+  border-radius: 10px;
+  min-height: 36px;
+  padding: 0 10px;
   box-shadow: none;
 }
-
 .widget-title > button:hover,
-.widget-buttons-grid > flowbox > flowboxchild > button:hover {
-  color: #061322;
-  background: #00c8ff;
+.widget-menubar button:hover {
+  color: @kona_fg;
+  background: @kona_accent_soft;
+  border-color: @kona_outline_strong;
+}
+.widget-title > button:focus-visible,
+.widget-menubar button:focus-visible,
+.widget-buttons-grid button:focus-visible,
+.notification-default-action:focus-visible {
+  outline: 2px solid @kona_focus;
+  outline-offset: 1px;
+}
+
+.widget-dnd { padding: 0 2px 7px; }
+.widget-dnd label { color: @kona_muted; font-size: 11px; }
+.widget-dnd switch {
+  background: @kona_surface_alt;
+  border: 1px solid @kona_outline;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.widget-dnd switch:checked { background: @kona_accent; }
+.widget-dnd switch slider { background: @kona_surface_elevated; border-radius: 999px; box-shadow: none; }
+
+.widget-buttons-grid flowboxchild { padding: 3px; }
+.widget-buttons-grid flowboxchild > button {
+  color: @kona_fg;
+  background: @kona_surface_elevated;
+  border: 1px solid @kona_outline;
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: none;
+}
+.widget-buttons-grid flowboxchild > button:hover,
+.widget-buttons-grid flowboxchild > button.toggle:checked {
+  background: @kona_accent_soft;
+  border-color: @kona_outline_strong;
+}
+
+.widget-mpris .widget-mpris-player {
+  background: @kona_surface_alt;
+  border: 1px solid @kona_outline;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.widget-mpris .widget-mpris-player .mpris-background { opacity: 0; }
+.widget-mpris .widget-mpris-player .mpris-overlay { background: transparent; padding: 12px; }
+.widget-mpris .widget-mpris-player .mpris-overlay button {
+  background: transparent;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.widget-mpris .widget-mpris-player .mpris-overlay button:hover { background: @kona_accent_soft; }
+
+.control-center .widget-volume { margin-bottom: 4px; padding: 4px 2px 0; }
+.widget-volume scale trough { background: @kona_surface_pressed; border-radius: 999px; }
+.widget-volume scale highlight { background: @kona_accent; border-radius: 999px; }
+.widget-volume scale slider { background: @kona_surface_elevated; border: 1px solid @kona_outline_strong; box-shadow: none; }
+.control-center .widget-menubar.audio { margin-bottom: 14px; }
+.control-center .widget-menubar.system {
+  border-bottom: 1px solid @kona_outline;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+.widget-menubar .session button:last-child { color: @kona_danger_text; border-color: alpha(@kona_danger, 0.42); }
+.widget-menubar .tools { background: @kona_surface_alt; border-radius: 10px; }
+.widget-menubar > revealer * button { margin: 0 4px 4px; }
+
+.notification-row { outline: none; background: transparent; }
+.notification-row .notification-background { padding: 4px 0; }
+.notification-row .notification-background .notification {
+  background: alpha(@kona_surface, 0.98);
+  border: 1px solid @kona_outline;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px @kona_shadow;
+}
+.notification-row .notification-background .notification.critical,
+.notification-group.critical { border-color: @kona_danger; }
+.notification-row .notification-background .notification .notification-default-action {
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 8px;
+}
+.notification-row .notification-background .notification .notification-default-action:hover { background: @kona_surface_alt; }
+.notification-content .summary { font-weight: 700; }
+.notification-content .body { color: @kona_muted; }
+.notification-content .time { color: @kona_muted; }
+.notification-action {
+  color: @kona_fg;
+  background: @kona_surface_elevated;
+  border: 1px solid @kona_outline;
+  border-radius: 10px;
+  min-height: 36px;
+  box-shadow: none;
+}
+.notification-action:hover { background: @kona_accent_soft; }
+.close-button {
+  color: @kona_muted;
+  background: @kona_surface_alt;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  box-shadow: none;
+  min-width: 28px;
+  min-height: 28px;
+  margin: 7px;
+  padding: 0;
+}
+.close-button:hover { color: @kona_fg; background: @kona_accent_soft; border-color: @kona_outline; }
+.notification-group:focus {
+  outline: 2px solid @kona_focus;
+  outline-offset: -2px;
+  border-radius: 12px;
 }

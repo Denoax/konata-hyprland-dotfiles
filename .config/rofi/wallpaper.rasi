@@ -1,0 +1,9 @@
+@import "shared.rasi"
+
+window { width: 700px; height: 500px; }
+listview { columns: 1; lines: 3; fixed-height: true; dynamic: false; scrollbar: false; spacing: 8px; }
+element { orientation: horizontal; padding: 9px; spacing: 14px; }
+element-icon { size: 80px; }
+element-text { vertical-align: 0.5; }
+entry { placeholder: "Filter wallpaper sets…"; }
+textbox-help { content: "Enter  Apply wallpaper     Esc  Keep current wallpaper"; }

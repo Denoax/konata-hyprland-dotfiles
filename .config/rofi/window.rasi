@@ -1,0 +1,9 @@
+@import "shared.rasi"
+
+configuration { window-format: "{c}  ·  {t}"; }
+window { width: 660px; }
+listview { lines: 7; }
+element { padding: 10px 11px; }
+element-icon { size: 28px; }
+entry { placeholder: "Filter by app or window title…"; }
+textbox-help { content: "Enter  Focus window     Esc  Cancel"; }

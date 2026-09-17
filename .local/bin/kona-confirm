@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ $# == 2 && -n "$1" && -n "$2" ]] || {
+  printf 'usage: %s PROMPT CONFIRM_LABEL\n' "$0" >&2
+  exit 2
+}
+
+prompt="$1"
+confirm="$2"
+choice="$(printf '%s\n' 'Cancel' "$confirm" | rofi -dmenu -i -p "$prompt" \
+  -no-custom -no-sort -selected-row 0 -u 1 -theme "$HOME/.config/rofi/confirm.rasi")" || exit 1
+[[ "$choice" == "$confirm" ]]

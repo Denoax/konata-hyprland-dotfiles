@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+icons="$HOME/.config/kona/menus/icons"
+if [[ "${1:-}" == --check ]]; then
+  if command -v bluetoothctl >/dev/null 2>&1; then
+    printf 'controller=cli paired_devices=%s\n' "$(bluetoothctl devices Paired 2>/dev/null | wc -l)"
+  else
+    printf 'controller=blueman cli_unavailable=true\n'
+  fi
+  exit 0
+fi
+
+if ! command -v bluetoothctl >/dev/null 2>&1; then
+  choice="$(printf 'Bluetooth devices\0icon\x1f%s/bluetooth.svg\n' "$icons" | \
+    rofi -dmenu -i -show-icons -no-custom -p 'Bluetooth' -mesg 'Device control is provided by Blueman on this system.' -theme "$HOME/.config/rofi/network.rasi")" || exit 0
+  [[ "$choice" == 'Bluetooth devices' ]] || exit 0
+  "$HOME/.local/bin/kona-menu-sound"
+  uwsm app -- blueman-manager >/dev/null 2>&1 &
+  exit 0
+fi
+
+records="$(mktemp)"
+trap 'rm -f -- "$records"' EXIT
+printf 'manager\topen\tBluetooth settings\n' >> "$records"
+while read -r _ address name; do
+  [[ -n "$address" ]] || continue
+  connected=false
+  bluetoothctl info "$address" 2>/dev/null | grep -q 'Connected: yes' && connected=true
+  marker='  '; [[ "$connected" == false ]] || marker='● '
+  printf 'device\t%s\t%s%s\n' "$address" "$marker" "${name:-$address}" >> "$records"
+done < <(bluetoothctl devices Paired 2>/dev/null)
+choice="$(cut -f3- "$records" | rofi -dmenu -i -no-custom -no-sort -format i -p 'Bluetooth' -theme "$HOME/.config/rofi/network.rasi")" || exit 0
+[[ "$choice" =~ ^[0-9]+$ ]] || exit 0
+record="$(awk -F '\t' -v n="$((choice + 1))" 'NR==n{print;exit}' "$records")"
+kind="$(cut -f1 <<< "$record")"; value="$(cut -f2 <<< "$record")"
+if [[ "$kind" == manager ]]; then
+  "$HOME/.local/bin/kona-menu-sound"; uwsm app -- blueman-manager >/dev/null 2>&1 &
+elif bluetoothctl info "$value" | grep -q 'Connected: yes'; then
+  bluetoothctl disconnect "$value"; "$HOME/.local/bin/kona-menu-sound"
+else
+  bluetoothctl connect "$value"; "$HOME/.local/bin/kona-menu-sound"
+fi

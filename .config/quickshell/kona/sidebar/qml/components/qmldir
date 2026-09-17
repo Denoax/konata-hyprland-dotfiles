@@ -1,0 +1,9 @@
+singleton Tokens 1.0 Tokens.qml
+singleton Feedback 1.0 Feedback.qml
+KIcon 1.0 KIcon.qml
+KSurface 1.0 KSurface.qml
+KButton 1.0 KButton.qml
+KThinSlider 1.0 KThinSlider.qml
+KSectionRow 1.0 KSectionRow.qml
+KAccordion 1.0 KAccordion.qml
+KRoundedImage 1.0 KRoundedImage.qml

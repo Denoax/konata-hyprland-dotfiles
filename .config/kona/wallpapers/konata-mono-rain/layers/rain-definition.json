@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "width": 1920,
+  "height": 1080,
+  "rain_width": 680,
+  "stable_from_x": 700,
+  "duration_seconds": 10,
+  "fps": 10,
+  "left_dimming": 0.08,
+  "columns": [
+    {"x": 18, "loop_height": 810, "cycles": 1, "phase": 77, "opacity": 0.22, "font_size": 17, "line_spacing": 7, "color": "6f8094", "head": "◇", "text": ["こ", "な", "た", "//", "01", "☆", "ら", "き", "す", "た", "10", "::", "こ", "な", "た"]},
+    {"x": 59, "loop_height": 930, "cycles": 1, "phase": 511, "opacity": 0.16, "font_size": 15, "line_spacing": 9, "color": "65778b", "head": "7", "text": ["7", "A", "0", "な", "8", "/", "2", "こ", "5", "B", "1", "た"]},
+    {"x": 101, "loop_height": 720, "cycles": 1, "phase": 304, "opacity": 0.36, "font_size": 18, "line_spacing": 8, "color": "8799ad", "head": "☆", "text": ["K", "O", "N", "A", "T", "A", "☆", "L", "S", "//", "0", "1"]},
+    {"x": 145, "loop_height": 1020, "cycles": 1, "phase": 872, "opacity": 0.19, "font_size": 15, "line_spacing": 8, "color": "607286", "head": ">", "text": ["PC...", "LIFE...", "OTAKU...", "DA YO...", ">_", "01", "10", "//"]},
+    {"x": 195, "loop_height": 870, "cycles": 1, "phase": 129, "opacity": 0.50, "font_size": 18, "line_spacing": 9, "color": "9aabba", "head": "KONATA", "text": ["KONATA", "KONATA", "KONATA", "KONATA", "KONATA", "KONATA", "KONATA", "☆"]},
+    {"x": 283, "loop_height": 990, "cycles": 1, "phase": 631, "opacity": 0.31, "font_size": 16, "line_spacing": 10, "color": "7d8fa3", "head": "LUCKY STAR", "text": ["LUCKY STAR", "LUCKY STAR", "LUCKY STAR", "LUCKY STAR", "LUCKY STAR", "LUCKY STAR", "//"]},
+    {"x": 404, "loop_height": 780, "cycles": 1, "phase": 219, "opacity": 0.42, "font_size": 17, "line_spacing": 8, "color": "8ca1b7", "head": "OTAKU", "text": ["OTAKU", "OTAKU", "OTAKU", "OTAKU", "OTAKU", "OTAKU", "01", "☆"]},
+    {"x": 490, "loop_height": 1080, "cycles": 1, "phase": 744, "opacity": 0.18, "font_size": 14, "line_spacing": 8, "color": "5f7185", "head": "R0", "text": ["R0", "Q1", "D8", "B7", "YC", "L2", "A0", "//", "な", "た", "01"]},
+    {"x": 532, "loop_height": 840, "cycles": 1, "phase": 431, "opacity": 0.25, "font_size": 16, "line_spacing": 9, "color": "73879c", "head": "DA", "text": ["DA", "YO", "...", "こ", "な", "た", "☆", "01", "10"]},
+    {"x": 574, "loop_height": 960, "cycles": 1, "phase": 88, "opacity": 0.14, "font_size": 14, "line_spacing": 9, "color": "596a7d", "head": "//", "text": ["//", "00", "11", "A8", "こ", "な", "た", "::", "7"]},
+    {"x": 618, "loop_height": 900, "cycles": 1, "phase": 707, "opacity": 0.20, "font_size": 15, "line_spacing": 8, "color": "697d91", "head": "☆", "text": ["☆", "1", "0", "K", "S", "な", "た", "//", "A"]},
+    {"x": 650, "loop_height": 750, "cycles": 2, "phase": 374, "opacity": 0.15, "font_size": 13, "line_spacing": 7, "color": "77899c", "head": ">", "text": [">", "0", "1", "//", "な", "A", "8", "こ"]},
+    {"x": 37, "loop_height": 1050, "cycles": 2, "phase": 932, "opacity": 0.13, "font_size": 12, "line_spacing": 10, "color": "536476", "head": "1", "text": ["1", "0", "1", "1", "0", "0", "1", "//"]},
+    {"x": 238, "loop_height": 825, "cycles": 2, "phase": 548, "opacity": 0.17, "font_size": 13, "line_spacing": 9, "color": "6b7d90", "head": "✦", "text": ["✦", "こ", "な", "た", "0", "1", "A", "B"]},
+    {"x": 363, "loop_height": 975, "cycles": 1, "phase": 35, "opacity": 0.16, "font_size": 14, "line_spacing": 10, "color": "627488", "head": "_", "text": ["_", "RUN", "WAIT", "0x7", "//", "01", "10"]}
+  ]
+}

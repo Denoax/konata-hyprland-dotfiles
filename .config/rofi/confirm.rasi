@@ -1,0 +1,6 @@
+@import "session.rasi"
+
+window { width: 420px; height: 250px; }
+listview { lines: 2; }
+entry { placeholder: "Cancel is selected by default"; }
+textbox-help { content: "Enter  Confirm selected choice     Esc  Cancel"; }

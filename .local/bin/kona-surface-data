@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Bounded adapters for the on-demand Deck/Studio. Existing owners perform actions."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HOME=Path.home()
+CONFIG=Path(os.environ.get('XDG_CONFIG_HOME', HOME/'.config'))/'kona'
+BIN=HOME/'.local/bin'
+
+
+def run(args, timeout=60):
+    p=subprocess.run([str(a) for a in args],capture_output=True,text=True,timeout=timeout)
+    if p.returncode: raise RuntimeError(p.stderr.strip() or p.stdout.strip() or f'{args[0]}: exit {p.returncode}')
+    return p.stdout.strip()
+
+def read(path, default):
+    try: return json.loads(path.read_text())
+    except FileNotFoundError: return default
+
+def atomic(path, data):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    fd,name=tempfile.mkstemp(prefix='.'+path.name,dir=path.parent)
+    try:
+        with os.fdopen(fd,'w') as f:
+            json.dump(data,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
+        os.replace(name,path)
+    finally: Path(name).unlink(missing_ok=True)
+
+# Reuse the preference owner's pure validator and atomic update boundary.
+import runpy
+_pref=runpy.run_path(str(Path(__file__).resolve().with_name('kona-preferences')))
+preferences=_pref['preferences']
+pref_update=_pref['update']
+
+def metrics():
+    mem={k:int(v.split()[0]) for k,v in (x.split(':',1) for x in Path('/proc/meminfo').read_text().splitlines())}
+    disk=shutil.disk_usage(HOME)
+    return {'memory':round((mem['MemTotal']-mem['MemAvailable'])/1048576,1),
+        'memoryTotal':round(mem['MemTotal']/1048576,1),'load':round(os.getloadavg()[0],2),
+        'diskFree':round(disk.free/1073741824),'diskTotal':round(disk.total/1073741824)}
+
+def status():
+    state=json.loads(run([BIN/'kona-state']))
+    state['metrics']=metrics()
+    try: state['notifications']=int(run(['swaync-client','-c'],5))
+    except (ValueError,RuntimeError,subprocess.SubprocessError):state['notifications']=None
+    try: state['network']=run(['nmcli','-t','-f','NAME','connection','show','--active'],5).splitlines()[0]
+    except (IndexError,RuntimeError,subprocess.SubprocessError):state['network']='Offline'
+    state['mosaic']=(Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/'kona/mosaic-return.json').exists()
+    state['preview']=(Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/'kona/wallpaper-preview.json').exists()
+    return state
+
+def shortcuts():
+    source=(HOME/'.config/hypr/hyprland.lua').read_text()
+    variables=dict(re.findall(r'local (\w+) = "([^"\n]+)"',source))
+    rows=[]
+    aliases={'terminal':'Terminal','launcher':'Application launcher','fileManager':'Files','browser':'Browser',
+             'window.close':'Close window','window.fullscreen':'Toggle fullscreen','window.float':'Toggle floating',
+             'window.pseudo':'Toggle pseudo tiling','layout':'Toggle split direction','workspace.toggle_special':'Toggle scratch workspace',
+             'window.move':'Move window','focus':'Focus workspace / window'}
+    for line in source.splitlines():
+        match=re.search(r'(bindSuper|hl\.bind)\("([^"\n]+)"\s*,\s*(.*)',line)
+        if not match:continue
+        kind,key,action=match.groups()
+        if key in ('SUPER_L','SUPER + SUPER_L'):continue  # internal press/release bookkeeping
+        key=('SUPER + ' if kind=='bindSuper' else '')+key
+        command=re.search(r'exec_cmd\("([^"\n]+)"',action)
+        variable=re.search(r'exec_cmd\((\w+)\)',action)
+        dispatcher=re.search(r'hl\.dsp\.([\w.]+)\(',action)
+        if command:
+            cmd=command.group(1)
+            if cmd.startswith('~/.local/bin/kona-'):label=cmd.removeprefix('~/.local/bin/kona-').replace('-',' ').capitalize()
+            elif 'rofi -show window' in cmd:label='Window switcher'
+            elif 'rofi -show run' in cmd:label='Run a command'
+            elif cmd.startswith('swaync-client'):label='Toggle Control Center'
+            elif cmd=='hyprlock':label='Lock desktop'
+            else:label='Open '+cmd
+        elif variable:label=aliases.get(variable.group(1),variables.get(variable.group(1),variable.group(1)))
+        elif dispatcher:label=aliases.get(dispatcher.group(1),dispatcher.group(1).replace('.',' ').capitalize())
+        elif action.startswith('function'):
+            body=source[source.index(line)+len(line):].split('\nend)',1)[0]
+            if 'tag:minimized' in body:label='Restore minimized window'
+            elif 'window.float' in body:label='Toggle floating'
+            else:continue
+        else:
+            name=action.split(',')[0].rstrip(')')
+            label=re.sub(r'(?<!^)(?=[A-Z])',' ',name).capitalize()
+        category='Customization' if any(x in label.lower() for x in ['profile','studio','wallpaper','shell','shortcuts','mosaic']) else 'Media' if any(x in label.lower() for x in ['audio','volume','play','previous','next']) else 'Capture' if any(x in label.lower() for x in ['record','screenshot','capture']) else 'System' if any(x in label.lower() for x in ['session','lock','night','updates','center']) else 'Workspaces' if any(x in label.lower() for x in ['workspace','overview','bank']) else 'Windows & apps'
+        rows.append({'keys':key,'label':label,'category':category})
+    seen={x['keys'].replace(' ','').lower() for x in rows}
+    for b in json.loads(run(['hyprctl','-j','binds'])):
+        mods=[name for bit,name in [(64,'SUPER'),(4,'CTRL'),(8,'ALT'),(1,'SHIFT')] if b['modmask']&bit]
+        key=' + '.join(mods+[b['key']]);number=b['key'].isdigit()
+        if key.replace(' ','').lower() not in seen and (number or b['key'].lower() in ('left','right')):
+            label=('Move window to workspace ' if b['modmask']&1 else 'Select workspace ')+str(int(b['key']) or 10) if number else ('Move window ' if b['modmask']&1 else 'Focus window ')+b['key'].lower()
+            rows.append({'keys':key,'label':b.get('description') or label,'category':'Workspaces' if number else 'Windows & apps'})
+            seen.add(key.replace(' ','').lower())
+    return rows
+
+def catalog():
+    roots=[HOME/'.local/share/wallpapers',HOME/'Pictures/Wallpapers']
+    favorites=preferences()['favorites'];rows=[]
+    for root in roots:
+        if not root.exists():continue
+        for p in sorted(root.rglob('*')):
+            if not p.is_file() or p.suffix.lower() not in ('.png','.jpg','.jpeg','.webp','.gif'):continue
+            if any(x in p.parts for x in ('thumbnails','.cache')):continue
+            rows.append({'path':str(p),'url':p.as_uri(),'name':p.stem.replace('-',' ').replace('_',' '),
+                         'animated':p.suffix.lower()=='.gif' or (p.suffix.lower()=='.webp' and b'ANIM' in p.open('rb').read(128)),
+                         'favorite':str(p) in favorites,'tag':p.parent.name})
+    rows.sort(key=lambda w: (not w["favorite"], "konata-command-center" not in w["path"], "v2/selected.png" not in w["path"],w["path"]))
+    return rows
+
+def snapshot():
+    versions={}
+    for name,cmd in {'Hyprland':['hyprctl','version'],'Matugen':['matugen','--version'],'Waybar':['waybar','--version'],'SwayNC':['swaync','--version'],'Rofi':['rofi','-v']}.items():
+        try: versions[name]=run(cmd,5).splitlines()[0]
+        except (RuntimeError,OSError,subprocess.SubprocessError):versions[name]='Unavailable'
+    state=status()
+    mode=state['wallpaper']['mode']
+    selected=Path(read(CONFIG/'scene-images.json',{}).get(mode,str(HOME/'.local/share/wallpapers/konata-command-center'/ {'simple':'v2/selected.png','static':'center.png','animated':'animated/center.webp'}[mode])))
+    try: appearance=json.loads(run([BIN/'kona-appearance','status']))
+    except (ValueError,RuntimeError,subprocess.SubprocessError): appearance={}
+    return {'state':state,'currentImage':str(selected),'currentImageUrl':selected.as_uri(),'prefs':preferences(),'tokens':read(CONFIG/'theme/current/tokens.json',{}),'appearance':appearance,
+            'motion':read(CONFIG/'motion.json',{}),'wallpapers':catalog(),'shortcuts':shortcuts(),
+            'monitors':json.loads(run(['hyprctl','-j','monitors'])),'versions':versions}
+
+def action(name,value):
+    if name=='profile':
+        run([BIN/'kona-appearance','revert'])
+        return run([BIN/'kona-profile','set',value])
+    if name.startswith('appearance-'):
+        op=name.removeprefix('appearance-')
+        if op=='mode':
+            if value not in ('light','dark'):raise ValueError('appearance mode must be light or dark')
+            result=run([BIN/'kona-appearance',value]);run([BIN/'kona-menu-sound'])
+            return json.loads(result)
+        if op not in ('preview','commit','revert','reset'):raise ValueError('unknown appearance action')
+        return run([BIN/'kona-appearance',op,*([value] if op=='preview' else [])])
+    if name=='mosaic-start':return run([BIN/'kona-profile','mosaic-start'])
+    if name=='scene':return run([BIN/'kona-profile','scene',value])
+    if name=='preview':return run([BIN/'kona-profile','preview',value])
+    if name in ('preview-revert','preview-apply'):return run([BIN/'kona-profile',name])
+    if name=='motion':
+        p=preferences();old=dict(p);p['motion']=value;preferences(p);pref_update({'motion':value})
+        try:run([BIN/'kona-motion'])
+        except Exception:pref_update({'motion':old['motion']},expected={'motion':value});raise
+        return value
+    if name=='intensity':
+        p=preferences();old=dict(p);p['intensity']=float(value);preferences(p);pref_update({'intensity':p['intensity']})
+        try:run([BIN/'kona-motion'])
+        except Exception:pref_update({'intensity':old['intensity']},expected={'intensity':p['intensity']});raise
+        return value
+    if name=='accent':
+        p=preferences();p['accent']=value;preferences(p)
+        if value=='cyan':run([BIN/'kona-theme','--default'])
+        else:
+            mode=json.loads(run([BIN/'kona-profile','status']))['wallpaper']['mode']
+            image=read(CONFIG/'scene-images.json',{}).get(mode,str(HOME/'.local/share/wallpapers/konata-command-center'/ {'simple':'v2/selected.png','static':'center.png','animated':'animated/center.webp'}[mode]))
+            run([BIN/'kona-theme','--image',image])
+        pref_update({'accent':value});return value
+    if name=='favorite':
+        p=preferences();f=p['favorites'];old=list(f);f.remove(value) if value in f else f.append(value)
+        preferences(p);pref_update({'favorites':f},expected={'favorites':old});return 'Favorite updated'
+    if name=='reset-motion':
+        pref_update({'motion':'full','intensity':1.0});return run([BIN/'kona-motion'])
+    if name=='export':
+        path=HOME/'Documents/Kona-preset.json';state=json.loads(run([BIN/'kona-profile','status']))
+        atomic(path,{'schema':1,'preferences':{k:v for k,v in preferences().items() if k!='favorites'},'profile':state['profile'],'scene':state['scene']})
+        return str(path)
+    if name=='import':
+        path=Path(value).expanduser();data=json.loads(path.read_text())
+        if data.get('schema')!=1 or set(data)!={'schema','preferences','profile','scene'}:raise ValueError('unsupported preset schema')
+        p=preferences(data['preferences'])
+        if data['profile'] not in ('daily','focus','gaming','showcase') or data['scene'] not in ('midnight','constellation','constellation-motion'):raise ValueError('invalid preset profile/scene')
+        # Imported presets are staged for explicit confirmation in Settings.
+        return data
+    if name=='apply-preset':
+        data=json.loads(value)
+        if data.get('schema')!=1 or set(data)!={'schema','preferences','profile','scene'}:raise ValueError('unsupported preset schema')
+        p=preferences(data['preferences'])
+        if data['profile'] not in ('daily','focus','gaming','showcase') or data['scene'] not in ('midnight','constellation','constellation-motion'):raise ValueError('invalid preset profile/scene')
+        old=preferences();p['favorites']=old['favorites']; old_state=json.loads(run([BIN/'kona-profile','status']))
+        written=False
+        try:
+            run([BIN/'kona-profile','scene',data['scene']])
+            run([BIN/'kona-profile','set',data['profile']])
+            pref_update(p,expected=old)
+            written=True
+            run([BIN/'kona-motion'])
+            run([BIN/'kona-appearance','reconcile'])
+            action('accent',p['accent'])
+        except Exception as primary:
+            errors=[]
+            if written:
+                try:pref_update(old,expected=p)
+                except Exception as e:errors.append(str(e))
+            restore={'schema':1,'profile':old_state['profile'],'return_to':old_state['return_to']}
+            for command in ([BIN/'kona-profile','scene',old_state['scene']],
+                            [BIN/'kona-profile','restore-intent',json.dumps(restore)],
+                            [BIN/'kona-motion'],[BIN/'kona-appearance','reconcile']):
+                try:run(command)
+                except Exception as e:errors.append(str(e))
+            if errors:raise RuntimeError(f'{primary}; preset rollback incomplete: '+ '; '.join(errors)) from primary
+            raise
+        return 'Preset applied'
+    if name=='open':
+        commands={'overview':[BIN/'kona-overview'],'capture':[BIN/'kona-screenshot','region-edit'],
+                  'audio':[BIN/'kona-audio-menu'],'notifications':['swaync-client','-t','-sw'],
+                  'wallpaper-fallback':[BIN/'kona-wallpaper-menu'],'launcher':['rofi','-show','drun','-theme',str(HOME/'.config/rofi/konata.rasi')],
+                  'updates':[BIN/'kona-updates'],'recovery':['kitty','--hold','hyprctl','configerrors']}
+        if value not in commands:raise ValueError('unknown action')
+        subprocess.Popen([str(x) for x in commands[value]],start_new_session=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        return value
+    raise ValueError('unknown action')
+
+def events():
+    import ctypes
+    import select
+    import struct
+    libc=ctypes.CDLL(None,use_errno=True)
+    fd=libc.inotify_init1(os.O_CLOEXEC)
+    if fd<0:raise OSError(ctypes.get_errno(),'inotify_init1')
+    state=Path(os.environ.get('XDG_STATE_HOME',HOME/'.local/state'))
+    runtime=Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))
+    directories=[state,state/'kona',runtime,runtime/'kona',runtime/'kona-record',CONFIG,CONFIG/'theme']
+    watched=set()
+    # A killed UI cannot close us gracefully. Observe its pipe lifetime alongside
+    # inotify so an otherwise quiet desktop cannot leave this subscriber orphaned.
+    poller=select.poll()
+    poller.register(fd,select.POLLIN)
+    poller.register(sys.stdout.fileno(),select.POLLERR|select.POLLHUP)
+    names={'profile.json','kona-wallpaper-mode','night-light-manual','pid','preferences.json','scene-images.json','wallpaper-preview.json','mosaic-return.json','current','kona','kona-record'}
+    try:
+        while True:
+            for directory in directories:
+                if directory.exists() and directory not in watched:
+                    if libc.inotify_add_watch(fd,os.fsencode(directory),0x100|0x200|0x80|0x8|0x400|0x800)>=0:watched.add(directory)
+            ready=dict(poller.poll())
+            if sys.stdout.fileno() in ready:return
+            data=os.read(fd,65536);offset=0;changed=set()
+            while offset<len(data):
+                _,mask,_,length=struct.unpack_from('iIII',data,offset);offset+=16
+                name=data[offset:offset+length].split(b'\0',1)[0].decode(errors='replace');offset+=length
+                if name in names:changed.add(name)
+                if mask & (0x400|0x800):watched.clear()
+            if changed:print(','.join(sorted(changed)),flush=True)
+    finally:os.close(fd)
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('command',choices=('snapshot','status','metrics','events','action'));parser.add_argument('name',nargs='?');parser.add_argument('value',nargs='?',default='');a=parser.parse_args()
+    if a.command=='events':events();return
+    data=metrics() if a.command=='metrics' else snapshot() if a.command=='snapshot' else status() if a.command=='status' else action(a.name,a.value)
+    print(json.dumps({'ok':True,'data':data}))
+if __name__=='__main__':
+    try:main()
+    except (OSError,ValueError,KeyError,RuntimeError,subprocess.SubprocessError) as e:
+        print(json.dumps({'ok':False,'error':str(e)}));sys.exit(1)

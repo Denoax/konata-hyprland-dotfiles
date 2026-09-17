@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""Single transactional owner for Kona geometry and system Light/Dark appearance."""
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import runpy
+
+HOME = Path.home()
+CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config"))
+STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state"))
+ROOT = CONFIG_HOME / "kona"
+THEME_ROOT = ROOT / "theme"
+STATE = STATE_HOME / "kona/appearance.json"
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "kona"
+PREVIEW = RUNTIME / "appearance-preview.json"
+GTK_FILES = (CONFIG_HOME / "gtk-3.0/settings.ini", CONFIG_HOME / "gtk-4.0/settings.ini")
+KDE_GLOBALS = CONFIG_HOME / "kdeglobals"
+MODES = ("light", "dark")
+PORTAL_VALUES = {"dark": 1, "light": 2}
+HOST_VALUES = {"dark": "prefer-dark", "light": "prefer-light"}
+QT_SCHEMES = {"dark": "BreezeDark", "light": "BreezeLight"}
+
+_pref = runpy.run_path(str(Path(__file__).resolve().with_name("kona-preferences")))
+_theme = runpy.run_path(str(Path(__file__).resolve().with_name("kona-theme")))
+
+FIELDS = {
+    "rounding": "decoration.rounding", "opacity": "decoration.active_opacity",
+    "inactive": "decoration.inactive_opacity", "blur": "decoration.blur.enabled",
+}
+DEFAULTS = {"rounding": 8, "opacity": .96, "inactive": .90, "blur": True}
+
+
+def read_json(path, default):
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return default
+
+
+def atomic_bytes(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, name = tempfile.mkstemp(prefix="." + path.name, dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def atomic_json(path, data):
+    atomic_bytes(path, (json.dumps(data, indent=2, sort_keys=True) + "\n").encode())
+
+
+def run(command, timeout=10, check=True):
+    environment = None
+    if str(command[0]) == "hyprctl":
+        environment = _theme["hyprland_environment"]()
+    result = subprocess.run([str(value) for value in command], capture_output=True, text=True, timeout=timeout, env=environment)
+    if check and (result.returncode or result.stdout.lower().startswith("error")):
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or f"{command[0]}: exit {result.returncode}")
+    return result.stdout.strip()
+
+
+def validate_geometry(value):
+    if not isinstance(value, dict) or set(value) != set(FIELDS):
+        raise ValueError("invalid appearance fields")
+    if type(value["rounding"]) is not int or not 6 <= value["rounding"] <= 16:
+        raise ValueError("rounding must be 6–16")
+    if any(type(value[key]) not in (int, float) or not .8 <= value[key] <= 1 for key in ("opacity", "inactive")):
+        raise ValueError("opacity must be 0.8–1")
+    if type(value["blur"]) is not bool:
+        raise ValueError("blur must be boolean")
+    return value
+
+
+# Preserve the established in-process contract used by the V4 validation suite.
+validate = validate_geometry
+
+
+def apply_geometry(value, profile=None):
+    if profile is None:
+        profile = json.loads(run([HOME / ".local/bin/kona-profile", "status"]))["profile"]
+    options = {FIELDS[key]: setting for key, setting in value.items()}
+    if profile in ("focus", "gaming"):
+        options["decoration.blur.enabled"] = False
+    code = "hl.config({" + ",".join("[" + json.dumps(key) + "]=" + json.dumps(setting) for key, setting in options.items()) + "})"
+    run(["hyprctl", "eval", code])
+
+
+def current_geometry():
+    values = {}
+    for key, option in FIELDS.items():
+        data = json.loads(run(["hyprctl", "-j", "getoption", option.replace(".", ":")]))
+        values[key] = data["bool" if key == "blur" else "int" if key == "rounding" else "float"]
+    return values
+
+
+def host_preference():
+    return run(["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"]).strip("'")
+
+
+def portal_preference():
+    output = run([
+        "gdbus", "call", "--session", "--dest", "org.freedesktop.portal.Desktop",
+        "--object-path", "/org/freedesktop/portal/desktop", "--method",
+        "org.freedesktop.portal.Settings.Read", "org.freedesktop.appearance", "color-scheme",
+    ])
+    match = re.search(r"uint32\s+(\d+)", output)
+    if not match:
+        raise RuntimeError(f"unrecognized portal color-scheme reply: {output}")
+    return int(match.group(1))
+
+
+def gtk_preference(path):
+    try:
+        match = re.search(r"(?mi)^\s*gtk-application-prefer-dark-theme\s*=\s*(\S+)\s*$", path.read_text())
+        if not match:
+            return None
+        return match.group(1).lower() in ("1", "true", "yes")
+    except FileNotFoundError:
+        return None
+
+
+def qt_scheme():
+    configured = run(["kreadconfig6", "--file", "kdeglobals", "--group", "General", "--key", "ColorScheme"])
+    if configured:
+        return configured
+    listing = run(["plasma-apply-colorscheme", "--list-schemes"])
+    match = re.search(r"^\s*\*\s+(.+?)\s+\(current color scheme\)\s*$", listing, re.MULTILINE)
+    if not match:
+        raise RuntimeError("could not read current Qt color scheme")
+    return match.group(1)
+
+
+def theme_mode():
+    appearance = _theme["source_appearance"](THEME_ROOT / "current")
+    return appearance["mode"] if appearance else None
+
+
+def durable_state():
+    value = read_json(STATE, None)
+    if isinstance(value, dict) and value.get("schema") == 1 and value.get("mode") in MODES and value.get("source") == "manual":
+        return value
+    return None
+
+
+def inferred_mode(host=None, portal=None):
+    host = host if host is not None else host_preference()
+    if host in ("prefer-light", "prefer-dark"):
+        return host.removeprefix("prefer-")
+    portal = portal if portal is not None else portal_preference()
+    return "light" if portal == 2 else "dark"
+
+
+def status():
+    host = host_preference()
+    portal = portal_preference()
+    state = durable_state()
+    mode = state["mode"] if state else inferred_mode(host, portal)
+    expected_dark = mode == "dark"
+    gtk = {str(path): gtk_preference(path) for path in GTK_FILES}
+    qt = qt_scheme()
+    synchronized = (
+        host == HOST_VALUES[mode] and portal == PORTAL_VALUES[mode]
+        and all(value is expected_dark for value in gtk.values())
+        and qt == QT_SCHEMES[mode] and theme_mode() == mode
+    )
+    return {
+        "schema": 1, "mode": mode, "source": state["source"] if state else "system",
+        "host": host, "portal": portal, "gtk": gtk, "qt": qt,
+        "theme": theme_mode(), "synchronized": synchronized,
+    }
+
+
+def update_ini_setting(path, key, value):
+    try:
+        lines = path.read_text().splitlines(keepends=True)
+    except FileNotFoundError:
+        lines = ["[Settings]\n"]
+    section = None
+    replaced = False
+    insert_at = len(lines)
+    for index, line in enumerate(lines):
+        match = re.match(r"\s*\[([^]]+)]", line)
+        if match:
+            if section == "Settings" and insert_at == len(lines):
+                insert_at = index
+            section = match.group(1)
+            continue
+        if section == "Settings" and re.match(rf"\s*{re.escape(key)}\s*=", line):
+            ending = "\n" if line.endswith("\n") else ""
+            lines[index] = f"{key}={value}{ending}"
+            replaced = True
+    if not replaced:
+        if not any(re.match(r"\s*\[Settings]", line) for line in lines):
+            if lines and not lines[-1].endswith("\n"):
+                lines[-1] += "\n"
+            lines.append("[Settings]\n")
+            insert_at = len(lines)
+        lines.insert(insert_at, f"{key}={value}\n")
+    atomic_bytes(path, "".join(lines).encode())
+
+
+def capture_file(path):
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def restore_file(path, content):
+    if content is None:
+        path.unlink(missing_ok=True)
+    else:
+        atomic_bytes(path, content)
+
+
+def set_host(mode):
+    run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", HOST_VALUES[mode]])
+    deadline = time.monotonic() + 3
+    while True:
+        if host_preference() == HOST_VALUES[mode] and portal_preference() == PORTAL_VALUES[mode]:
+            return
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"portal did not publish {mode} appearance")
+        time.sleep(.1)
+
+
+def notify_kde():
+    try:
+        subprocess.run([
+            "qdbus6", "org.kde.KGlobalSettings", "/KGlobalSettings", "notifyChange", "0", "0",
+        ], capture_output=True, timeout=5)
+    except OSError:
+        pass
+
+
+def switch(mode, source="manual"):
+    if mode not in MODES:
+        raise ValueError("appearance mode must be light or dark")
+    before_state = capture_file(STATE)
+    before_host = host_preference()
+    before_gtk = {path: capture_file(path) for path in GTK_FILES}
+    before_kde = capture_file(KDE_GLOBALS)
+    before_qt = qt_scheme()
+    before_appearance = _theme["source_appearance"](THEME_ROOT / "current")
+    before_files = _theme["render"](before_appearance) if before_appearance else None
+    desired = _theme["appearance_tokens"](THEME_ROOT, mode)
+    desired_files = _theme["render"](desired)
+    changed = []
+    try:
+        set_host(mode)
+        for path in GTK_FILES:
+            update_ini_setting(path, "gtk-application-prefer-dark-theme", "true" if mode == "dark" else "false")
+        run(["plasma-apply-colorscheme", QT_SCHEMES[mode]], timeout=15)
+        changed = _theme["activate"](THEME_ROOT, desired_files)
+        failed = _theme["reload_consumers"](THEME_ROOT, changed)
+        if failed:
+            raise RuntimeError("consumer reload failed: " + ", ".join(failed))
+        if host_preference() != HOST_VALUES[mode] or portal_preference() != PORTAL_VALUES[mode]:
+            raise RuntimeError("system/portal appearance verification failed")
+        if any(gtk_preference(path) is not (mode == "dark") for path in GTK_FILES):
+            raise RuntimeError("GTK appearance verification failed")
+        if qt_scheme() != QT_SCHEMES[mode]:
+            raise RuntimeError("Qt appearance verification failed")
+        if theme_mode() != mode:
+            raise RuntimeError("Kona appearance verification failed")
+        atomic_json(STATE, {"schema": 1, "mode": mode, "source": source})
+        result = status()
+        if not result["synchronized"]:
+            raise RuntimeError("appearance state did not converge")
+        result["changed"] = changed
+        return result
+    except Exception:
+        if before_files is not None:
+            rollback_changed = _theme["activate"](THEME_ROOT, before_files)
+            _theme["reload_consumers"](THEME_ROOT, rollback_changed)
+        run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", before_host], check=False)
+        for path, content in before_gtk.items():
+            restore_file(path, content)
+        if before_qt:
+            run(["plasma-apply-colorscheme", before_qt], timeout=15, check=False)
+        restore_file(KDE_GLOBALS, before_kde)
+        notify_kde()
+        restore_file(STATE, before_state)
+        raise
+
+
+def reconcile_mode():
+    state = durable_state()
+    if state and not status()["synchronized"]:
+        return switch(state["mode"], state["source"])
+    return status()
+
+
+def geometry_command(command, arguments):
+    preferences = read_json(ROOT / "preferences.json", {})
+    if command == "reconcile":
+        if "appearance" in preferences:
+            apply_geometry(validate_geometry(preferences["appearance"]), arguments[0] if arguments else None)
+        return reconcile_mode()
+    if command == "preview":
+        if not arguments:
+            raise ValueError("preview requires JSON")
+        candidate = validate_geometry(json.loads(arguments[0]))
+        pending = read_json(PREVIEW, {"before": current_geometry()})
+        pending["candidate"] = candidate
+        atomic_json(PREVIEW, pending)
+        try:
+            apply_geometry(candidate)
+        except Exception:
+            apply_geometry(pending["before"])
+            PREVIEW.unlink(missing_ok=True)
+            raise
+        return {"preview": candidate}
+    if command == "revert":
+        pending = read_json(PREVIEW, None)
+        if pending:
+            apply_geometry(pending["before"])
+            PREVIEW.unlink(missing_ok=True)
+        return {"reverted": bool(pending)}
+    if command == "commit":
+        pending = read_json(PREVIEW, None)
+        if not pending:
+            raise ValueError("no appearance preview to apply")
+        _pref["update"]({"appearance": validate_geometry(pending["candidate"])})
+        PREVIEW.unlink(missing_ok=True)
+        return {"committed": True}
+    if command == "reset":
+        apply_geometry(DEFAULTS)
+        _pref["update"]({"appearance": DEFAULTS})
+        PREVIEW.unlink(missing_ok=True)
+        return {"reset": True}
+    raise ValueError("unknown appearance operation")
+
+
+def main():
+    if len(sys.argv) < 2:
+        raise ValueError("usage: kona-appearance light|dark|toggle|status|reconcile|preview|revert|commit|reset")
+    command, arguments = sys.argv[1], sys.argv[2:]
+    if command == "status":
+        print(json.dumps(status(), sort_keys=True))
+        return
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    with (RUNTIME / "appearance.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if command in MODES:
+            current = status()
+            result = current if current["mode"] == command and current["synchronized"] else switch(command)
+        elif command == "toggle":
+            result = switch("light" if status()["mode"] == "dark" else "dark")
+        else:
+            result = geometry_command(command, arguments)
+    if result is not None:
+        print(json.dumps(result, sort_keys=True))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f"kona-appearance: {error}", file=sys.stderr)
+        sys.exit(1)

@@ -5,11 +5,34 @@ state_root="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kona-record"
 pid_file="$state_root/pid"
 start_file="$state_root/started"
 
-if [[ -s "$pid_file" ]] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
-  started="$(cat "$start_file" 2>/dev/null || date +%s)"
-  elapsed=$(( $(date +%s) - started ))
-  printf -v clock '%02d:%02d' $((elapsed / 60)) $((elapsed % 60))
-  jq -cn --arg text "● $clock" --arg tooltip 'Screen recording active\nClick to stop and save' \
+case "${1:-}" in
+  '')
+    if [[ -d "$state_root" ]]; then
+      exec 9>"$state_root/lock"
+      flock -s -w 2 9 || exit 1
+    fi
+    ;;
+  --active-unlocked) ;; # Writer already owns the exclusive lock.
+  *) printf 'usage: %s\n' "$0" >&2; exit 2 ;;
+esac
+active=false
+pid="$(cat "$pid_file" 2>/dev/null || true)"
+if [[ "$pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$pid" 2>/dev/null; then
+  stat="$(cat "/proc/$pid/stat" 2>/dev/null || true)"
+  fields="${stat##*) }"
+  read -ra fields <<< "$fields"
+  birth="$(cat "$state_root/birth" 2>/dev/null || true)"
+  # Legacy recordings lack birth; accept only an actual wf-recorder process.
+  if [[ -n "$birth" && "$birth" == "${fields[19]:-}" && "${fields[0]:-}" != Z ]] ||
+     [[ -z "$birth" && "$(cat "/proc/$pid/comm" 2>/dev/null || true)" == wf-recorder ]]; then
+    active=true
+  fi
+fi
+if [[ "${1:-}" == --active-unlocked ]]; then printf '%s\n' "$active"; exit 0; fi
+
+if [[ "$active" == true ]]; then
+  # Transition-only refresh cannot display a truthful ticking elapsed clock.
+  jq -cn --arg text '● REC' --arg tooltip 'Screen recording active\nClick to stop and save' \
     '{text:$text,tooltip:$tooltip,class:"recording"}'
 else
   jq -cn '{text:"",tooltip:"Start an active-monitor recording",class:"idle"}'

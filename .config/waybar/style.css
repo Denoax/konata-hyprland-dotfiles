@@ -1,12 +1,4 @@
-@define-color ink #061322;
-@define-color panel rgba(7, 24, 42, 0.88);
-@define-color panel-soft rgba(10, 38, 65, 0.78);
-@define-color line rgba(0, 200, 255, 0.46);
-@define-color cyan #00c8ff;
-@define-color sky #65dcff;
-@define-color text #d9f7ff;
-@define-color muted #7ba7bd;
-@define-color green #56e39f;
+@import "../kona/theme/current/waybar.css";
 
 * {
   border: none;
@@ -17,129 +9,112 @@
   font-weight: 600;
 }
 
-window#waybar {
+/* Only related modules share a surface; the outer layer stays transparent. */
+window#waybar,
+window#waybar > box {
   background: transparent;
   color: @text;
+  box-shadow: none;
 }
 
-window#waybar > box {
+#navigation,
+#context,
+#time,
+#controls,
+#hardware,
+#status {
   background: @panel;
-  border: 1px solid @line;
-  border-radius: 7px;
-  box-shadow: 0 0 18px rgba(0, 174, 230, 0.12);
+  border: 1px solid alpha(@muted, .28);
+  border-radius: 8px;
 }
+
+window#waybar.DP-4 #navigation { border-color: @line; }
+#time { border-color: @secondary-line; }
 
 tooltip {
-  background: rgba(5, 20, 36, 0.97);
+  background: @ink;
   border: 1px solid @line;
-  border-radius: 7px;
+  border-radius: 8px;
 }
 
-tooltip label {
-  color: @text;
-  padding: 8px;
-}
+tooltip label { color: @text; padding: 8px; }
 
 #custom-kona {
   color: @sky;
-  font-size: 22px;
   font-weight: 700;
-  padding: 0 15px 0 13px;
-  border-right: 1px solid rgba(0, 200, 255, 0.22);
+  padding: 0 12px;
+  border-right: 1px solid @accent-22;
 }
 
-#workspaces {
-  padding: 3px 6px;
-}
+#workspaces { padding: 3px 4px; }
 
 #workspaces button {
-  color: @muted;
+  color: @text;
   background: transparent;
   border-radius: 4px;
-  min-width: 24px;
-  padding: 2px 6px;
+  min-width: 22px;
+  padding: 0 5px;
   margin: 0 2px;
+  box-shadow: none;
 }
 
-#workspaces button:hover {
-  color: @text;
-  background: rgba(0, 200, 255, 0.12);
-}
+#workspaces button.empty { color: @muted; }
+#workspaces button:hover { color: @text; background: @accent-12; }
+#workspaces button.active { color: @accent-on; background: @cyan; }
+#workspaces button.urgent { color: @accent-on; background: @danger; }
 
-#workspaces button.active {
-  color: @ink;
-  background: @cyan;
-  box-shadow: 0 0 10px rgba(0, 200, 255, 0.35);
-}
-
-#workspaces button.urgent {
-  color: @ink;
-  background: @green;
-}
-
-#window {
-  color: @muted;
-  padding: 0 12px;
-  font-style: italic;
-}
+#window { color: @muted; padding: 0 14px; }
 
 #clock {
   color: @sky;
-  background: @panel-soft;
-  border: 1px solid rgba(101, 220, 255, 0.24);
-  border-radius: 5px;
-  padding: 2px 16px;
-  letter-spacing: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 16px;
 }
 
-#tray,
-#network,
+
 #pulseaudio,
+#network,
+#custom-controls,
+#custom-system,
 #cpu,
 #memory,
 #custom-gpu,
-#custom-recording,
-#custom-gaming,
-#custom-notifications {
-  padding: 0 9px;
-}
+#tray,
+#custom-notifications { padding: 0 10px; }
 
-#network,
 #pulseaudio,
+#network,
 #cpu,
 #memory,
-#custom-gpu {
-  color: #b8d9e8;
+#custom-gpu { color: @muted; }
+
+#custom-controls,
+#custom-system,
+#custom-notifications { color: @sky; }
+
+#custom-controls,
+#custom-notifications { border-left: 1px solid alpha(@muted, .20); }
+
+#hardware:hover { border-color: @line; }
+
+#custom-kona:hover,
+#custom-controls:hover,
+#custom-notifications:hover,
+#pulseaudio:hover,
+#network:hover { color: @text; }
+
+#custom-recording.recording,
+#custom-gaming.active {
+  padding: 0 10px;
+  border-right: 1px solid alpha(@muted, .20);
 }
 
-#custom-notifications {
-  color: @cyan;
-  padding-right: 13px;
-}
-
-#custom-recording.recording {
-  color: #ff5d78;
-  background: rgba(255, 46, 87, 0.14);
-  border: 1px solid rgba(255, 93, 120, 0.52);
-  border-radius: 5px;
-  padding: 0 9px;
-}
+#custom-recording.recording { color: @danger; }
+#custom-gaming.active { color: @green; }
 
 #custom-recording.idle,
-#custom-gaming.inactive {
-  padding: 0;
-  margin: 0;
-}
-
-#custom-gaming.active {
-  color: #56e39f;
-  background: rgba(86, 227, 159, 0.12);
-  border: 1px solid rgba(86, 227, 159, 0.42);
-  border-radius: 5px;
-  padding: 0 9px;
-}
+#custom-gaming.inactive { padding: 0; margin: 0; }
 
 #network.disconnected,
-#pulseaudio.muted {
-  color: #ff7891;
-}
+#pulseaudio.muted { color: @danger; }

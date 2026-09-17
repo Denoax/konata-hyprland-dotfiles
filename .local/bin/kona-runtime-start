@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Invoked once by hyprland.start, never by config reload. A UWSM app scope alone
+# is not a managed session: check the compositor, not merely installed binaries.
+if ! "$HOME/.local/bin/kona-runtime-health" owner; then
+  printf 'Kona: another Hyprland instance owns this login session; skipping duplicate session startup.\n' >&2
+  exit 0
+fi
+
+if uwsm check is-active hyprland.desktop; then
+  uwsm finalize
+  # Keep Waybar's accepted restart semantics: an independent graphical scope,
+  # not automatic respawn that could unhide the bar during focus/gaming.
+  uwsm app -s s -t scope -u kona-waybar -- waybar &
+  systemctl --user start hypridle.service swaync.service \
+    kona-clipboard@text.service kona-clipboard@image.service \
+    kona-automount.service kona-osd.service
+  # NetworkManager and Blueman already have XDG autostart entries. UWSM owns
+  # their generated units; launching them here as well would duplicate owners.
+else
+  printf 'Kona: starting the canonical plain Hyprland session owners.\n' >&2
+  hypridle &
+  waybar &
+  # Preserve independent launches if one component fails.
+  nm-applet --indicator &
+  blueman-applet &
+  udiskie --tray &
+  wl-paste --type text --watch cliphist store &
+  wl-paste --type image --watch cliphist store &
+  "$HOME/.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-server" \
+    --config "$HOME/.config/swayosd/config.toml" --style "$HOME/.config/swayosd/style.css" &
+fi
+
+# The user manager survives PlasmaLogin sessions and may retain the previous
+# compositor's environment. Import the current event-provided values, prove both
+# sockets are usable, then recover any old start-limit before replacing the
+# packaged agent owner. The unit's ExecCondition repeats the same readiness check
+# on crash recovery, preventing a logout-time restart storm.
+session_variables=()
+for variable in DISPLAY WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE \
+  XDG_CURRENT_DESKTOP XDG_SESSION_TYPE; do
+  [[ -v "$variable" ]] && session_variables+=("$variable")
+done
+if ! systemctl --user import-environment "${session_variables[@]}"; then
+  printf 'Kona: could not import the current Hyprland environment for user services.\n' >&2
+elif ! "$HOME/.local/bin/kona-runtime-health" wait-ready --timeout 5; then
+  printf 'Kona: Hyprland did not become ready; polkit agent remains stopped.\n' >&2
+else
+  systemctl --user reset-failed hyprpolkitagent.service || true
+  if ! systemctl --user restart hyprpolkitagent.service; then
+    printf 'Kona: polkit agent failed to start; run kona-runtime-health polkit.\n' >&2
+  elif ! "$HOME/.local/bin/kona-runtime-health" polkit >/dev/null; then
+    printf 'Kona: polkit owner started but failed its health assertion.\n' >&2
+  fi
+fi
+
+# Reconcile the durable Light/Dark intent once per compositor start. The command exits;
+# it does not add a watcher or a second session owner.
+"$HOME/.local/bin/kona-appearance" reconcile >/dev/null ||
+  printf 'Kona: appearance reconciliation failed; preserved previous system state.\n' >&2

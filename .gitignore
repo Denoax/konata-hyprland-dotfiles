@@ -11,3 +11,15 @@ __pycache__/
 **/credentials*
 **/*token*
 **/*secret*
+# Semantic color tokens are recovery data, not authentication credentials.
+!.config/kona/theme/default/tokens.json
+!.config/kona/menus/tokens/
+!.config/kona/menus/tokens/*.json
+!.config/quickshell/kona/sidebar/tokens/
+!.config/quickshell/kona/sidebar/tokens/*.json
+!.config/quickshell/kona/sidebar/tokens/*.css
+.config/kona/theme/generations/
+.config/kona/theme/.lock
+.config/kona/theme/reload-pending.json
+.config/kona/theme/.current-next
+.config/kona/theme/.reload-pending

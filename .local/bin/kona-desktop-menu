@@ -23,9 +23,13 @@ fi
 
 choice="$({
   printf '%s\n' \
+    'Control Center' \
+    'Kona Settings' \
+    'Shortcut Help' \
     'System Settings' \
     'Display Settings' \
-    'Network Connections' \
+    'Network' \
+    'Bluetooth' \
     'Sound Settings' \
     'Audio Devices' \
     'Mouse Settings' \
@@ -35,21 +39,27 @@ choice="$({
     'Updates' \
     'Night Light' \
     'Backup Now' \
+    'Profiles' \
+    'Wallpapers' \
     'Restore Wallpaper' \
     'Files' \
     'Terminal' \
     'Lock PC' \
     'Power / Session'
-} | rofi -dmenu -i -p 'Desktop' -theme ~/.config/rofi/konata.rasi)" || exit 0
+} | rofi -dmenu -i -p 'Desktop' -theme ~/.config/rofi/list.rasi)" || exit 0
 
 launch() {
   uwsm app -- "$@" >/dev/null 2>&1 &
 }
 
 case "$choice" in
+  'Control Center') ~/.local/bin/kona-dashboard ;;
+  'Kona Settings') ~/.local/bin/kona-shell studio ;;
+  'Shortcut Help') ~/.local/bin/kona-shell shortcuts ;;
   'System Settings') launch systemsettings ;;
   'Display Settings') launch systemsettings kcm_kscreen ;;
-  'Network Connections') launch systemsettings kcm_networkmanagement ;;
+  'Network') ~/.local/bin/kona-network-menu ;;
+  'Bluetooth') ~/.local/bin/kona-bluetooth-menu ;;
   'Sound Settings') launch systemsettings kcm_pulseaudio ;;
   'Audio Devices') ~/.local/bin/kona-audio-menu ;;
   'Mouse Settings') launch systemsettings kcm_mouse ;;
@@ -57,8 +67,10 @@ case "$choice" in
   'Workspace Overview') ~/.local/bin/kona-overview ;;
   'Quick Settings') ~/.local/bin/kona-quick-settings ;;
   'Updates') ~/.local/bin/kona-updates ;;
-  'Night Light') ~/.local/bin/kona-night-light toggle ;;
-  'Backup Now') ~/.local/bin/kona-backup ;;
+  'Night Light') ~/.local/bin/kona-night-light toggle && ~/.local/bin/kona-menu-sound ;;
+  'Backup Now') ~/.local/bin/kona-confirm 'Sync, commit, and push desktop backup?' 'Sync, commit, and push' && ~/.local/bin/kona-backup ;;
+  'Profiles') ~/.local/bin/kona-profile-menu ;;
+  'Wallpapers') ~/.local/bin/kona-wallpaper-menu ;;
   'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;
   'Files') launch xdg-open "$HOME" ;;
   'Terminal') launch kitty ;;

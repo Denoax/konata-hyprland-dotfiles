@@ -1,5 +1,37 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-selection=$(cliphist list | rofi -dmenu -i -p 'CLIPBOARD' -theme ~/.config/rofi/konata.rasi) || exit 0
-[[ -n "$selection" ]] || exit 0
-printf '%s' "$selection" | cliphist decode | wl-copy
+temporary="$(mktemp -d "${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/kona-clipboard.XXXXXX")"
+trap 'rm -rf -- "$temporary"' EXIT
+umask 077
+cliphist list > "$temporary/list"
+
+set +e
+selection="$(rofi -dmenu -i -no-custom -no-show-icons -no-sort -display-columns 2 \
+  -kb-custom-1 'Alt+d' -kb-custom-2 'Alt+c' -p 'Clipboard' \
+  -theme "$HOME/.config/rofi/clipboard.rasi" < "$temporary/list")"
+status=$?
+set -e
+
+case "$status" in
+  0)
+    [[ -n "$selection" ]] || exit 0
+    # Decode completely before replacing the clipboard; failed decoding leaves it intact.
+    printf '%s' "$selection" | cliphist decode > "$temporary/item"
+    wl-copy < "$temporary/item"
+    "$HOME/.local/bin/kona-menu-sound"
+    ;;
+  10)
+    [[ -n "$selection" ]] || exit 0
+    "$HOME/.local/bin/kona-confirm" 'Delete this clipboard item?' 'Delete item' || exit 0
+    printf '%s' "$selection" | cliphist delete
+    "$HOME/.local/bin/kona-menu-sound"
+    ;;
+  11)
+    "$HOME/.local/bin/kona-confirm" 'Clear clipboard history?' 'Clear history' || exit 0
+    cliphist wipe
+    "$HOME/.local/bin/kona-menu-sound"
+    ;;
+  1) exit 0 ;;
+  *) exit "$status" ;;
+esac

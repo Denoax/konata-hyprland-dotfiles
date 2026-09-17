@@ -1,0 +1,7 @@
+@import "shared.rasi"
+
+window { width: 620px; }
+listview { lines: 9; }
+element-icon { enabled: true; size: 20px; }
+entry { placeholder: "Search actions…"; }
+textbox-help { content: "Enter  Run action     Esc  Cancel"; }

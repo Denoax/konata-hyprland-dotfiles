@@ -1,0 +1,15 @@
+[Unit]
+Description=Kona SwayOSD feedback server
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+ExecStart=%h/.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-server --config %h/.config/swayosd/config.toml --style %h/.config/swayosd/style.css
+Slice=session-graphical.slice
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5

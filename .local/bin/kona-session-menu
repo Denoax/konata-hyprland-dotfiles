@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-choice=$(printf '%s\n' 'LOCK' 'LOG OUT' 'REBOOT' 'SHUT DOWN' | rofi -dmenu -i -p 'SESSION // KONA' -theme ~/.config/rofi/konata.rasi) || exit 0
+if [[ "${1:-}" == --check ]]; then
+  printf '%s\n' 'actions=lock,log-out,restart,shut-down confirmations=cancel-first owner=hyprlock,hyprctl,systemd'
+  exit 0
+fi
+
+icons="$HOME/.config/kona/menus/icons"
+menu="$(mktemp)"
+trap 'rm -f -- "$menu"' EXIT
+printf 'Lock\0icon\x1f%s/lock.svg\n' "$icons" > "$menu"
+printf 'Log out\0icon\x1f%s/logout.svg\n' "$icons" >> "$menu"
+printf 'Restart\0icon\x1f%s/restart.svg\n' "$icons" >> "$menu"
+printf 'Shut down\0icon\x1f%s/power.svg\n' "$icons" >> "$menu"
+choice="$(rofi -dmenu -i -show-icons -p 'Power and session' -no-custom -no-sort \
+  -selected-row 0 -u '1,2,3' -theme "$HOME/.config/rofi/session.rasi" < "$menu")" || exit 0
 
 case "$choice" in
-  LOCK)
-    hyprlock
+  'Lock')
+    "$HOME/.local/bin/kona-menu-sound"
+    exec hyprlock
     ;;
-  'LOG OUT')
-    confirm=$(printf '%s\n' 'CANCEL' 'LOG OUT' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
-    [[ "$confirm" == 'LOG OUT' ]] && hyprctl dispatch 'hl.dsp.exit()'
+  'Log out')
+    "$HOME/.local/bin/kona-confirm" 'Log out of Kona?' 'Log out' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    hyprctl dispatch 'hl.dsp.exit()'
     ;;
-  REBOOT)
-    confirm=$(printf '%s\n' 'CANCEL' 'REBOOT' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
-    [[ "$confirm" == 'REBOOT' ]] && systemctl reboot
+  'Restart')
+    "$HOME/.local/bin/kona-confirm" 'Restart this computer?' 'Restart' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    systemctl reboot
     ;;
-  'SHUT DOWN')
-    confirm=$(printf '%s\n' 'CANCEL' 'SHUT DOWN' | rofi -dmenu -p 'CONFIRM' -theme ~/.config/rofi/konata.rasi)
-    [[ "$confirm" == 'SHUT DOWN' ]] && systemctl poweroff
+  'Shut down')
+    "$HOME/.local/bin/kona-confirm" 'Shut down this computer?' 'Shut down' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    systemctl poweroff
     ;;
 esac

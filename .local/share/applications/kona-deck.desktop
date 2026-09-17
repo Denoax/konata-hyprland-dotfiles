@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kona Control Center
+Comment=Notifications, quick controls, audio, and session actions
+Exec=kona-dashboard
+Icon=preferences-system-notifications
+Terminal=false
+Categories=Settings;Utility;
+Keywords=Kona;Desktop;Customization;

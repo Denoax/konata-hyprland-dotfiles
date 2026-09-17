@@ -1,12 +1,12 @@
 configuration {
   modi: "drun,run,window";
   show-icons: true;
-  icon-theme: "Papirus-Dark";
+  icon-theme: "Papirus-Light";
   terminal: "kitty";
   drun-display-format: "{name}";
-  display-drun: "APPS";
-  display-run: "RUN";
-  display-window: "WINDOWS";
+  display-drun: "Apps";
+  display-run: "Run";
+  display-window: "Windows";
   matching: "fuzzy";
   sort: true;
   hover-select: true;

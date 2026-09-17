@@ -5,82 +5,115 @@ wall_root="$HOME/.local/share/wallpapers/konata-command-center"
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}"
 state_file="$state_root/kona-wallpaper-mode"
 
-start_daemon() {
-  if ! pgrep -x awww-daemon >/dev/null 2>&1; then
-    uwsm app -- awww-daemon --no-cache --quiet >/dev/null 2>&1 &
-  fi
+# Public selection stays compatible with Task05; one coordinator serializes all
+# profile and scene writers. The internal worker only applies backend state.
+case "${1:-toggle}" in
+  status) cat "$state_file" 2>/dev/null || printf 'animated\n'; exit 0 ;;
+  simple|static|animated|toggle|restore) exec "$HOME/.local/bin/kona-profile" wallpaper "${1:-toggle}" ;;
+  --image-policy) [[ $# == 3 ]] || exit 2; profile="$2"; preview_image="$3"; mode=simple ;;
+  --apply-policy) [[ $# == 3 ]] || exit 2; profile="$2"; mode="$3" ;;
+  *) printf 'usage: %s {simple|animated|static|toggle|restore|status}\n' "$0" >&2; exit 2 ;;
+esac
+case "$profile" in daily|focus|gaming|showcase) ;; *) exit 2 ;; esac
+case "$mode" in simple|static|animated) ;; *) exit 2 ;; esac
 
+static=false
+[[ "$profile" != focus && "$profile" != gaming ]] || static=true
+if [[ "$mode" == simple ]]; then
+  images=("$wall_root/v2/selected.png" "$wall_root/v2/selected.png" "$wall_root/v2/selected.png")
+elif [[ "$mode" == animated && "$static" == false ]]; then
+  images=("$wall_root/animated/left.webp" "$wall_root/animated/center.webp" "$wall_root/animated/right.webp")
+else
+  images=("$wall_root/left.png" "$wall_root/center.png" "$wall_root/right.png")
+fi
+custom_image="${preview_image:-$(python3 - "$mode" <<'PYIMAGE'
+import json,os,sys
+from pathlib import Path
+p=Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home()/'.config')))/'kona/scene-images.json'
+print(json.loads(p.read_text()).get(sys.argv[1], '') if p.exists() else '')
+PYIMAGE
+)}"
+if [[ -n "$custom_image" ]]; then
+  if [[ "$static" == true && "$mode" == animated ]]; then
+    # An animated custom scene may ship a composition-matched still beside it.
+    # Restricted profiles must never leave an animated file resident merely
+    # because a custom scene overrides the legacy three-panel assets.
+    animated_static_fallback="${custom_image%.*}-static.png"
+    if [[ -r "$animated_static_fallback" && -s "$animated_static_fallback" ]]; then
+      images=("$animated_static_fallback" "$animated_static_fallback" "$animated_static_fallback")
+    fi
+  else
+    images=("$custom_image" "$custom_image" "$custom_image")
+  fi
+fi
+for image in "${images[@]}"; do
+  [[ -r "$image" && -s "$image" && "$image" != *$'\n'* && "$image" != *,* ]] || {
+    printf 'Wallpaper asset unavailable or unsupported IPC path: %s\n' "$image" >&2; exit 1;
+  }
+done
+monitors="$(hyprctl monitors -j)"
+mapfile -t outputs < <(jq -r 'sort_by(.x)[] | .name' <<< "$monitors")
+(( ${#outputs[@]} >= 3 )) || { printf 'Three active monitors were not detected.\n' >&2; exit 1; }
+
+start_awww() {
+  if ! pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then
+    uwsm app -s b -- awww-daemon --no-cache --quiet >/dev/null 2>&1 &
+  fi
   for _ in {1..50}; do
     awww query >/dev/null 2>&1 && return 0
     sleep 0.1
   done
-  notify-send -u critical 'Wallpaper error' 'The animated wallpaper daemon did not start.'
-  return 1
+  printf 'Awww did not become ready.\n' >&2; return 1
+}
+paper_ipc() {
+  local reply
+  reply="$(hyprctl hyprpaper "$@")" || return 1
+  # Installed hyprctl reports an absent Hyprpaper socket with exit status zero.
+  [[ "$reply" != error:* ]] || { printf '%s\n' "$reply" >&2; return 1; }
+}
+start_hyprpaper() {
+  if ! pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then
+    uwsm app -s b -- hyprpaper --config "$HOME/.config/hypr/hyprpaper.conf" >/dev/null 2>&1 &
+  fi
+  for _ in {1..50}; do
+    paper_ipc listactive >/dev/null 2>&1 && return 0
+    sleep 0.1
+  done
+  printf 'Hyprpaper did not become ready.\n' >&2; return 1
 }
 
-apply_mode() {
-  local mode="$1"
-  local extension directory
-  local -a outputs
-
-  case "$mode" in
-    simple)
-      directory="$wall_root/v2"
-      extension="png"
-      ;;
-    animated)
-      directory="$wall_root/animated"
-      extension="webp"
-      ;;
-    static)
-      directory="$wall_root"
-      extension="png"
-      ;;
-    *)
-      printf 'usage: %s {simple|animated|static|toggle|restore|status}\n' "$0" >&2
-      return 2
-      ;;
-  esac
-
-  pkill -x hyprpaper >/dev/null 2>&1 || true
-  start_daemon
-  mapfile -t outputs < <(hyprctl monitors -j | jq -r 'sort_by(.x)[] | .name')
-
-  if (( ${#outputs[@]} < 3 )); then
-    notify-send -u critical 'Wallpaper error' 'Three active monitors were not detected.'
-    return 1
-  fi
-
-  if [[ "$mode" == "simple" ]]; then
-    awww img "$directory/selected.png" --resize crop --transition-type fade --transition-duration 0.6 --transition-fps 60
+# Prepare and populate the replacement before stopping the old backend. Failed
+# switches retain the old owner until the coordinator attempts rollback.
+if [[ "$static" == true ]]; then
+  start_hyprpaper
+  for i in "${!outputs[@]}"; do
+    image="${images[$(( i < 3 ? i : 1 ))]}"
+    paper_ipc wallpaper "${outputs[$i]},$image,cover"
+  done
+  if pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then awww kill; fi
+  for _ in {1..50}; do
+    if ! pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then exit 0; fi
+    sleep .1
+  done
+  printf 'Awww remained active after static-policy switch.\n' >&2; exit 1
+else
+  start_awww
+  if [[ "$mode" == simple ]]; then
+    awww img "${images[0]}" --resize crop --transition-type fade --transition-duration 0.6 --transition-fps 60
+  elif [[ "${images[0]}" == "${images[1]}" && "${images[1]}" == "${images[2]}" ]]; then
+    # One decode/IPC transaction is enough when a custom scene spans every output.
+    awww img "${images[0]}" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
   else
-    awww img --outputs "${outputs[0]}" "$directory/left.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
-    awww img --outputs "${outputs[1]}" "$directory/center.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
-    awww img --outputs "${outputs[2]}" "$directory/right.$extension" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
+    for i in "${!outputs[@]}"; do
+      awww img --outputs "${outputs[$i]}" "${images[$(( i < 3 ? i : 1 ))]}" --resize crop --transition-type fade --transition-duration 1 --transition-fps 60
+    done
   fi
-
-  install -d "$state_root"
-  printf '%s\n' "$mode" > "$state_file"
-}
-
-mode="${1:-toggle}"
-case "$mode" in
-  toggle)
-    current="$(cat "$state_file" 2>/dev/null || printf 'animated')"
-    [[ "$current" == "animated" ]] && apply_mode static || apply_mode animated
-    ;;
-  restore)
-    apply_mode "$(cat "$state_file" 2>/dev/null || printf 'animated')"
-    ;;
-  status)
-    cat "$state_file" 2>/dev/null || printf 'animated\n'
-    ;;
-  simple|animated|static)
-    apply_mode "$mode"
-    notify-send 'Wallpaper' "${mode^} background enabled"
-    ;;
-  *)
-    printf 'usage: %s {simple|animated|static|toggle|restore|status}\n' "$0" >&2
-    exit 2
-    ;;
-esac
+  if pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then
+    pkill -u "$(id -u)" -x hyprpaper
+    for _ in {1..50}; do
+      if ! pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then exit 0; fi
+      sleep .1
+    done
+    printf 'Hyprpaper remained active after Awww-policy switch.\n' >&2; exit 1
+  fi
+fi

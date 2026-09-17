@@ -1,0 +1,15 @@
+[Unit]
+Description=Kona %i clipboard history watcher
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+ExecStart=/usr/bin/wl-paste --type %i --watch /usr/bin/cliphist store
+Slice=background-graphical.slice
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5
