@@ -89,7 +89,7 @@ deferred under `PERFORMANCE_POLICY.md`.
 ## Evidence and rollback
 
 Evidence and pre-change source/live backups are under
-`/home/mani/.local/state/kona/full-redesign-20260915/`. The concise rendered set is in
+`~/.local/state/kona/full-redesign-20260915/`. The concise rendered set is in
 its `evidence/` directory, including `clean-primary-desktop.png`,
 `sidebar-expanded-final.png`, `sidebar-collapsed.png`, `launcher.png`,
 `window-switcher.png`, `music-popup.png`, `quick-controls.png`,
@@ -121,4 +121,4 @@ wallpaper source limits in the raw asset pack remain unchanged.
   redesign, and broad icon-theme mutation was kept out of this pass.
 - File-manager behavior and ownership are unchanged; new Kitty windows receive the new
   palette, while already-open terminals keep their current colors until reloaded.
-- The later sidebar-navigation/identity pass has its own separate visual review gate.
+- The later sidebar-navigation/identity pass is accepted in the 2026-09-16 release checkpoint.

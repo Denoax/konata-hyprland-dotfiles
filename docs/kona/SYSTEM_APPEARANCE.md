@@ -2,8 +2,8 @@
 
 ## Status
 
-Implementation and technical validation are complete; Mani's visual review is pending.
-The installed desktop is left in **Light** mode.
+Implementation, technical validation and the installed visual checkpoint are accepted for the 2026-09-16 release.
+The release capture set verifies both Light and Dark modes.
 
 ## Ownership and data flow
 
@@ -71,7 +71,7 @@ application manually forced to a theme remains application-owned.
 ## Validation and evidence
 
 Evidence and exact pre-change backups are under
-`/home/mani/.local/state/kona/system-appearance-20260915/`.
+`~/.local/state/kona/system-appearance-20260915/`.
 
 - `tests/appearance.py`: command, idempotence, persistence, portal verification and complete
   rollback on a forced portal failure.

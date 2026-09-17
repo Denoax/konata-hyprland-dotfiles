@@ -1,8 +1,8 @@
 # Kona V4 reference-supremacy pass
 
-Candidate implemented and ready for Mani's visual review, 2026-09-14. Visual approval
-is **not** claimed. Native Qt screen-reader exposure remains a capability limitation.
-No commit/push or other remote Git operation was performed.
+Historical candidate implemented on 2026-09-14. Its surviving installed surfaces are
+accepted in the 2026-09-16 release; later reports supersede rejected or retired parts. Native
+Qt screen-reader exposure remains a capability limitation.
 
 Authority: actual dirty branch `kona-v3/task01-event-state`, HEAD
 `dac844f554e37eef9368fbf26860be65237422de`, accepted Tasks01–06 plus deployed
@@ -11,7 +11,7 @@ Task07. Historical HEAD alone does not reproduce this desktop. Task07 remains
 old Task08–10 are suspended, not started by this pass.
 
 Evidence root (abbreviated `E` below):
-`/home/mani/.local/state/kona/v4-20260914-111330`.
+`~/.local/state/kona/v4-20260914-111330`.
 The ZIP was extracted separately under `E/pack/`. Original dirty-tree/live backups,
 Task07 handoff, adverse results and previous task evidence remain preserved.
 

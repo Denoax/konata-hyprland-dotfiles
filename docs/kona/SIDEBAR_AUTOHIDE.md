@@ -21,7 +21,7 @@ collapsed rail hover, bubble/collapse click-through, Tab focus, Escape/rearm and
 close. Native log has no new QML warnings. Motion clip inspected. Scope/source-live audit
 passes; no other product paths changed. QA input corrections are in ADVERSE.md.
 
-Evidence/backups: `/home/mani/.local/state/kona/sidebar-autohide-20260915/`.
+Evidence/backups: `~/.local/state/kona/sidebar-autohide-20260915/`.
 Review hover-autohide.mp4; state/log/test/audit/patch evidence is alongside it.
 Changed product files: sidebar/shell.qml and new qml/SidebarVisibility.qml.
 Added tests/tst_sidebar_visibility.qml. Docs updated. Source/live backups retained;

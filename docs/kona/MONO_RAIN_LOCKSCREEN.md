@@ -1,6 +1,6 @@
 # Kona Mono Rain lockscreen
 
-Status: **READY FOR MANI — KONA MONO RAIN LOCKSCREEN REVIEW**
+Status: **accepted in the 2026-09-16 release checkpoint**
 
 This checkpoint changes only the Hyprlock surface. Hyprlock remains the session-lock and
 input owner, and the system PAM stack remains the authentication path. No QML password UI,
@@ -81,7 +81,7 @@ measurement, not aggregate desktop CPU or GPU timing.
 ## Evidence and rollback
 
 Evidence and exact pre-change configs:
-`/home/mani/.local/state/kona/mono-rain-lockscreen-20260915/`
+`~/.local/state/kona/mono-rain-lockscreen-20260915/`
 
 Key evidence:
 

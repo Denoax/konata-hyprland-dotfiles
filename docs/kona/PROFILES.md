@@ -64,7 +64,7 @@ and regenerates the selected scene's palette. No session-restart test or login t
 claim is made by Task06; startup contracts are covered in isolated recovery tests.
 
 Task06 rollback copies, the accepted dirty-tree baseline, adverse runs and validation
-live in `/home/mani/.local/state/kona/task06-20260913-215052`.
+live in `~/.local/state/kona/task06-20260913-215052`.
 Task01–Task05 approvals remain authoritative. Task07 is not started.
 
 ## Measurement limits

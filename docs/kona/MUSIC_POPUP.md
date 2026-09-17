@@ -1,9 +1,7 @@
-# Kona music popup — final polish review candidate
+# Kona music popup — accepted implementation history
 
-**READY FOR MANI — MUSIC POPUP FINAL POLISH REVIEW**. Only this popup is authorized.
-The running implementation awaits Mani approval; no next surface is started.
-Branch `kona-v3/task01-event-state`, HEAD `dac844f554e37eef9368fbf26860be65237422de`
-unchanged; accepted dirty work remains in place.
+Technical validation and the installed visual checkpoint are accepted in the 2026-09-16 release.
+The branch/SHA details below describe the historical implementation checkpoint.
 
 Run `kona-music-popup`, or select **Kona Music** in the application launcher. Running it
 again toggles it; `kona-music-popup close` closes it. No bar, shortcut, Studio, profile,
@@ -26,7 +24,7 @@ The added halo and perimeter glow use the installed Qt 6.11.2
 36px blur, 4px spread and 0.20 color alpha; the hero halo uses 0.16 alpha. Reference
 artwork was not installed. No packages, launcher, other UI, session or Git history changes.
 
-Final evidence: `/home/mani/.local/state/kona/music-polish-20260914-171204/`.
+Final evidence: `~/.local/state/kona/music-polish-20260914-171204/`.
 
 - `live-final/playing.png`, `live-final/paused.png`: real installed Spotify captures.
 - `live-final/playing-pause-close.mp4`: 6.283s native recording; temporal frames and
@@ -52,7 +50,7 @@ and `PROJECT_HANDOFF.md`. Source/live hashes and the scoped patch are in the evi
 Pre-polish files are in `backup/`; `rollback.py` previews restoration of only these
 three live files, with `--apply` and current-hash guards. Close the popup before rollback.
 
-Technical checks complete; final visual approval pending. The pre-existing Qt AT-SPI
+Technical checks complete; the installed result is accepted in the 2026-09-16 release. The pre-existing Qt AT-SPI
 child-tree limitation below remains, without a new screen-reader claim. No next surface.
 
 ## Implementation
@@ -100,7 +98,7 @@ Checksums and provenance are in the evidence manifest. No donor installer was ru
 ## Validation and evidence
 
 Evidence root:
-`/home/mani/.local/state/kona/music-popup-20260914-162244`.
+`~/.local/state/kona/music-popup-20260914-162244`.
 Pack extracted separately under `pack/`; all15 supplied manifest hashes pass.
 
 - Real Spotify: metadata/art/spectrum, advancing position, pointer Pause, focused Space
@@ -152,7 +150,7 @@ Close only this popup with `kona-music-popup close`. The unchanged Deck and audi
 surfaces remain available. To remove the installed candidate, run:
 
 ```sh
-python3 /home/mani/.local/state/kona/music-popup-20260914-162244/rollback-music-popup.py --apply
+python3 ~/.local/state/kona/music-popup-20260914-162244/rollback-music-popup.py --apply
 ```
 
 The rollback checks final hashes before removing the eight new installed popup files;

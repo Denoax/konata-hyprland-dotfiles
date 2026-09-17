@@ -2,7 +2,7 @@
 
 ## Status
 
-**READY FOR MANI — KONATA MONO RAIN LIVE WALLPAPER REVIEW**
+**Accepted in the 2026-09-16 release checkpoint.**
 
 This scoped pass implements only the supplied Konata Mono Rain wallpaper. The approved
 reference remains the static authority; procedural motion is confined to the left rain
@@ -64,7 +64,7 @@ the live animation process was absent in that state.
 
 ## Evidence and recovery
 
-Evidence and backups: `/home/mani/.local/state/kona/mono-rain-20260915/`.
+Evidence and backups: `~/.local/state/kona/mono-rain-20260915/`.
 
 Review artifacts:
 

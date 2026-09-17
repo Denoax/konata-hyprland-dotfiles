@@ -1,8 +1,7 @@
 # Sidebar navigation and system identity — 2026-09-15
 
-Status: technically validated and installed; Mani visual review is pending. The full
-desktop redesign that preceded this pass is visually approved and remains the baseline.
-This pass does not claim approval for the navigation or identity refinements.
+Status: technically validated, installed and accepted in the 2026-09-16 release checkpoint.
+The release approval supersedes this report's historical visual-review gate.
 
 ## Scope and ownership
 
@@ -64,7 +63,7 @@ validated `Image` plus `MultiEffect` renderer was restored before the final scre
 ## Evidence and rollback
 
 Evidence and pre-change source/live backups are under
-`/home/mani/.local/state/kona/sidebar-navigation-20260915/`. The review set is:
+`~/.local/state/kona/sidebar-navigation-20260915/`. The review set is:
 
 - `evidence/clean-desktop-no-dock.png`
 - `evidence/sidebar-expanded-final.png`

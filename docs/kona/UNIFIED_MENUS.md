@@ -1,6 +1,6 @@
-# Kona unified menus — visual-review checkpoint
+# Kona unified menus — accepted checkpoint
 
-Status: **technical PASS; Mani visual approval pending**.
+Status: **technical PASS; installed visuals accepted for the 2026-09-16 release**.
 
 The Frost foundation is installed across SwayNC, Rofi, and SwayOSD. Existing state
 owners remain authoritative: SwayNC owns notifications/control center, Rofi owns
@@ -91,7 +91,7 @@ captures use safe fixtures to avoid recording private application and clipboard 
 their real owner paths are covered by isolated behavior tests and live `--check` output.
 
 Evidence and exact pre-change rollback copies are under
-`/home/mani/.local/state/kona/unified-menus-20260915/`. The motion artifact is
+`~/.local/state/kona/unified-menus-20260915/`. The motion artifact is
 `evidence/motion/swaync-open-close.webm`; rendered surfaces are in
 `evidence/screenshots/`. Branch `kona-v3/task01-event-state`, HEAD
 `dac844f554e37eef9368fbf26860be65237422de`; accepted dirty work remains uncommitted.

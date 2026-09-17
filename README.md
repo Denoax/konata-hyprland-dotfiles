@@ -1,190 +1,96 @@
-<img src="./showcase/assets/hero-motion.gif" alt="Konata Command Center — an Arch Linux and Hyprland desktop with a dark midnight-blue interface and Konata Izumi artwork" width="100%">
+# Kona Desktop
 
-<br>
+![Kona across three displays with the Mono Rain scene and sidebar](showcase/assets/hero-dark.webp)
 
-> A three-display Arch Linux environment built around midnight blue, precise
-> motion, fast window control, and Konata-Chan.
+A Konata Izumi themed Arch Linux and Hyprland desktop built for daily use on one real workstation.
 
-Hi guys i made this complete awesome configuration for Arch-Hyprland! Hyprland is configured
-in Lua and backed by a custom Waybar, auto-hiding dock, application launcher,
-media deck, audio controls, session restoration, workspace memory, capture
-tools, night light, gaming mode, and recovery workflow.
+Kona combines Hyprland's native Lua configuration with a full-height Quickshell sidebar, event-driven workspace state, unified transient menus, an MPRIS music popup, system Light/Dark propagation, profiles, recovery tools, and the monochrome Mono Rain scene. It is a personal three-monitor profile made public to use, study, and adapt.
 
 ## The desktop
 
-<img src="./showcase/assets/command-center-panorama.png" alt="The complete three-monitor Konata Command Center with Fastfetch, a blue signal field, and Btop" width="100%">
-
-| Interface layer | Terminal layer |
+| Dark | Light |
 | --- | --- |
-| <img src="./showcase/assets/interface-tour.gif" alt="Animated tour of quick settings, per-app audio, workspace overview, and media controls" width="100%"> | <img src="./showcase/assets/terminal-tour.gif" alt="Animated tour of Fastfetch, Matrix signal view, and Btop" width="100%"> |
+| ![Dark Kona sidebar](showcase/assets/sidebar-dark.webp) | ![Light Kona sidebar](showcase/assets/sidebar-light.webp) |
 
-### Media deck
+![Sidebar reveal and auto-hide motion](showcase/assets/sidebar-reveal.webp)
 
-<img src="./showcase/assets/media-deck.png" alt="Floating Konata media deck with album art, transport controls, progress, and a live CAVA spectrum" width="100%">
-
-The media view is a real interactive terminal application. It reads MPRIS
-metadata, downloads the current cover, tracks progress, drives playback, and
-renders live PipeWire audio through CAVA.
-
-<details>
-<summary><strong>More real screenshots</strong></summary>
-
-#### Quick settings
-
-<img src="./showcase/assets/quick-settings.png" alt="Konata quick-settings panel over the signal workspace" width="100%">
-
-#### Workspace overview
-
-<img src="./showcase/assets/workspace-overview.png" alt="Ten-workspace overview with retained live thumbnails" width="100%">
-
-#### Clean three-monitor wallpaper
-
-<img src="./showcase/assets/desktop-clean.png" alt="Clean three-monitor Konata wallpaper and Waybar layout" width="100%">
-
-</details>
-
-## System map (My Monitor Configuration)
-
-```text
-SAMSUNG / HDMI-A-1        PIXIO / DP-4                    ACER / HDMI-A-5
-1920×1080 @ 60 Hz         1920×1080 @ 240 Hz              1920×1080 @ 120 Hz
-workspaces 1 / 4 / 7      workspaces 2 / 5 / 8 / 10       workspaces 3 / 6 / 9
-```
-
-| Layer | Implementation |
+| Native music popup | Notifications and control center |
 | --- | --- |
-| Compositor | Hyprland 0.56+ using native Lua configuration |
-| Session | UWSM-managed Wayland session with KDE Plasma kept as fallback |
-| Shell | Waybar, Rofi, SwayNC, nwg-drawer, and a customized nwg-dock-hyprland |
-| Terminal | Kitty + JetBrainsMono Nerd Font |
-| Audio | PipeWire, WirePlumber, MPRIS, Playerctl, and CAVA |
-| Capture | Grim, Slurp, Satty, wf-recorder, and the Hyprland desktop portal |
-| Wallpaper | Awww with static and animated three-monitor sets |
+| ![Quickshell music popup with live MPRIS metadata](showcase/assets/music-popup.webp) | ![SwayNC notification and control center](showcase/assets/control-center.webp) |
 
-## What is built in
+| Launcher | Lock screen |
+| --- | --- |
+| ![Rofi application launcher](showcase/assets/launcher.webp) | ![Hyprlock Mono Rain lock screen with an empty password field](showcase/assets/lockscreen.webp) |
 
-- **Windows-like muscle memory.** `Alt + Tab`, `Alt + F4`, maximize, minimize,
-  show desktop, snapping, edge resizing, and monitor-aware movement.
-- **Independent drag and tab groups.** Drag windows freely or drop one directly
-  over another to create a compact tabbed group.
-- **Smart bottom dock.** It appears at the screen edge or with a tap of Super,
-  follows the active monitor, searches apps, closes apps directly, and restores
-  minimized windows.
-- **Quick control layer.** Audio devices, per-app volume, night light, gaming
-  mode, screen recording, workspace overview, updates, backup, Wi-Fi,
-  Bluetooth, settings, and power live in one panel.
-- **Remembered state.** Supported apps return to their workspace at login;
-  floating windows also retain exact size, position, and fullscreen state.
-- **Visible system state.** Recording and gaming modes get persistent Waybar
-  indicators. Volume, brightness, media, Caps Lock, and Num Lock use a themed
-  on-screen display.
-- **Safe maintenance.** Updates require confirmation, use a full `pacman -Syu`,
-  and expose package history and cached versions for rollback investigation.
-- **Reproducible recovery.** Configuration, custom binaries, wallpapers,
-  dependency manifests, capture scripts, and a tested restore path live here.
+The wallpaper's character and flowers stay stable while the left text field moves in a deterministic loop. The lock screen uses its own matching 80-frame rain cycle; Hyprlock and PAM remain the only authentication path.
+
+## What is custom
+
+- **Primary navigation:** an auto-hiding Quickshell sidebar replaces the retired dock. It owns profile identity, app navigation, workspaces, media and desktop controls.
+- **One appearance owner:** `kona-appearance` coordinates Kona's semantic tokens, portal preference, GTK, Qt and websites that follow `prefers-color-scheme`.
+- **One owner per runtime:** Hyprland starts the plain-session shell; packaged systemd units own polkit and notifications; menus and policy commands remain transient.
+- **Four profiles:** Daily, Focus, Showcase and Gaming select scenes and policy without creating another theme daemon.
+- **Unified menus:** Rofi, SwayNC and SwayOSD share the same semantic color, motion, focus and feedback language.
+- **Recoverable state:** window sessions, workspace previews, config backups and scoped rollback live under `~/.local/state/kona/`.
+
+See [Architecture](docs/ARCHITECTURE.md) for the owner map and generated-state boundaries.
 
 ## Install
 
-This repository currently targets Arch Linux and Hyprland's Lua configuration
-introduced in Hyprland 0.55. It is a personal hardware profile made public for
-people to use, study, and adapt.
+This is an opinionated Arch profile, not a universal Hyprland distribution. Read the plan before writing anything:
 
 ```bash
 git clone https://github.com/Denoax/konata-hyprland-dotfiles.git
 cd konata-hyprland-dotfiles
+./install.sh --dry-run
+```
+
+Before the first real install, review [the installation guide](docs/INSTALL.md) and [Mani's hardware profile](docs/HARDWARE_PROFILE.md). In particular, change the checked-in connector names, modes and workspace map in `.config/hypr/hyprland.lua` for your displays.
+
+```bash
 ./install.sh
 ```
 
-The installer:
+The installer backs up every target it replaces. It does not install system packages or machine-specific GPU drivers. Optional personal Flatpaks require `--with-flatpaks`. The canonical login is **PlasmaLogin → Hyprland**, using the plain `/usr/bin/start-hyprland` session.
 
-1. backs up replaced configuration under `~/.local/state/kona/`;
-2. restores the shell, scripts, wallpapers, and custom dock;
-3. downloads Satty, SwayOSD, wf-recorder, and Hyprsunset into a user-local
-   directory without requiring sudo;
-4. restores missing Flatpak applications;
-5. records the clone location so `kona-backup` can update the same repository.
+## Everyday controls
 
-System packages are intentionally **not** installed automatically. Review
-[`packages/pacman.txt`](./packages/pacman.txt), then install the pieces suitable
-for your machine. NVIDIA and Intel packages in that list describe the original
-computer; they are not universal recommendations.
-
-### Change the monitor map first
-
-The checked-in profile uses `HDMI-A-1`, `DP-4`, and `HDMI-A-5`. Run
-`hyprctl monitors`, then edit the monitor and workspace rules near the top of
-[`hyprland.lua`](./.config/hypr/hyprland.lua) if your connector names,
-resolutions, positions, or refresh rates differ.
-
-For a configuration-only recovery or test:
-
-```bash
-./install.sh --config-only
-./tests/recovery-smoke.sh
-```
-
-## Controls
-
-| Shortcut | Action |
+| Control | Action |
 | --- | --- |
-| Tap `Super` | Show or hide the dock |
-| `Super + Space` | Application launcher |
-| `Super + C` | Unified quick settings |
-| `Super + W` | Thumbnail workspace overview |
-| `Super + Return` | Terminal |
-| `Super + Shift + Return` | Three-screen command center |
+| Tap `Super` | Pin or hide the sidebar |
+| Hover the left edge | Reveal the sidebar temporarily |
+| `Super + Space` | Applications |
+| `Super + Shift + Return` | Notifications / control center |
 | `Alt + Tab` | Window switcher |
-| `Alt + F4` | Close window |
-| `Ctrl + H` / `Super + H` | Minimize active app |
-| `Alt + left drag` | Move a window independently |
-| `Alt + right drag` | Resize a window |
-| `Super + G` | Gaming mode |
-| `Super + U` | Updates and rollback |
-| `Super + Shift + A` | Audio-device picker |
-| `Super + Ctrl + A` | Per-app audio mixer |
-| `Super + Shift + S` | Region capture + annotation |
-| `Super + Shift + R` | Start or stop region recording |
-| `Super + Ctrl + Shift + R` | Record the active monitor |
-| `Ctrl + right-click` on desktop | Desktop/system menu |
+| `Super + V` | Clipboard |
+| `Super + W` | Workspace overview |
+| `Super + Ctrl + P` | Profile picker |
+| `Super + Shift + W` | Wallpaper picker |
+| `Super + L` | Lock |
+| `Ctrl + Alt + Delete` | Power and session menu |
 
-The full binding map lives in [`hyprland.lua`](./.config/hypr/hyprland.lua).
+The complete map is in [Keybinds](docs/KEYBINDS.md).
 
-## Repository anatomy
+## Customize without fighting generated state
 
-```text
-.config/                 compositor and desktop configuration
-.local/bin/              Kona control scripts and custom dock
-.local/share/            desktop entry and wallpaper collection
-packages/                Arch, Flatpak, and user-service manifests
-patches/                 exact custom-dock source changes
-showcase/                real capture and deterministic media render tools
-tests/                   isolated recovery smoke test
-install.sh               backup-aware restore entry point
-```
+- Edit monitor and input rules in `.config/hypr/hyprland.lua`.
+- Edit semantic source colors in `.config/kona/appearance/light.json` and `dark.json`; use `kona-appearance light|dark` to render and apply them.
+- Manage scenes in `.config/kona/profiles.json` and `.config/kona/scene-images.json`.
+- Treat `.config/kona/theme/current/` as generated output.
+- Keep private application theme overrides in the application itself; Kona does not rewrite browser or editor profiles.
 
-`showcase/capture-showcase.sh` stages clean workspaces 7–9, captures the real
-desktop, and restores the previous workspace state. `showcase/render-media.sh`
-rebuilds the sharp title treatment, MP4 clips, and optimized GIFs.
+See [Customization](docs/CUSTOMIZATION.md) before changing generated files.
 
-## Recovery
+## Recovery and current status
 
-KDE Plasma remains installed and unmodified. If the Hyprland profile ever
-needs repair, log out, select Plasma at the login screen, and run:
+Use `./install.sh --config-only` to restore the checked-in configuration without downloading user-local helpers. Existing files are copied to `~/.local/state/kona/pre-restore-*` first. [Recovery](docs/RECOVERY.md) covers the Plasma fallback, appearance rollback and runtime checks.
 
-```bash
-kona-backup
-# or, from a clean clone
-./install.sh
-```
+The current visual checkpoint is accepted and represented by the real screenshots above. Runtime ownership has passed in-session restart, crash recovery and authorization checks. One complete real PlasmaLogin logout/login lifecycle check remains; see [Current status](docs/CURRENT_STATUS.md).
 
-## Credits and status
+The previous dock/media-deck desktop remains available as the [Legacy desktop](https://github.com/Denoax/konata-hyprland-dotfiles/tree/legacy/pre-kona-2026.09).
 
-The custom dock is based on
-[`nwg-piotr/nwg-dock-hyprland`](https://github.com/nwg-piotr/nwg-dock-hyprland)
-v0.4.11 under the MIT License. See
-[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) for its exact patch and the
-fan-project disclaimer.
+## Credits and license status
 
-Konata Izumi and Lucky Star belong to their respective creators and rights
-holders. This repository is an unofficial, non-commercial fan project and is
-not endorsed by the rights holders, Arch Linux, or Hyprland.
+Konata Izumi and *Lucky Star* belong to their respective creators and rights holders. This is an unofficial, non-commercial fan project and is not affiliated with or endorsed by those rights holders, Arch Linux, Hyprland, or the other upstream projects it integrates.
+
+The repository does not currently grant a project-wide license. Third-party components and artwork retain their own terms; see [Third-party notices](THIRD_PARTY_NOTICES.md).

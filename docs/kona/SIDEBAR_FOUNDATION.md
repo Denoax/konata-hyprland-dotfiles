@@ -38,7 +38,7 @@ Changed product files: `sidebar/shell.qml`, `sidebar/qml/SidebarView.qml`,
 Also changed: `tests/tst_sidebar.qml`, review decisions, this report and project handoff.
 HEAD `dac844f554e37eef9368fbf26860be65237422de`; accepted dirty tree retained.
 
-Evidence/backups: `/home/mani/.local/state/kona/sidebar-foundation-r2-20260914/`.
+Evidence/backups: `~/.local/state/kona/sidebar-foundation-r2-20260914/`.
 Review `post-reboot/expanded.png`, `post-reboot/collapsed.png`,
 `post-reboot/expand-collapse.mp4`. This clip is silent. Human aesthetic/audio approval
 belongs to Mani; no native screen-reader certification or new touch gesture is claimed.

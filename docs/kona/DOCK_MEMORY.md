@@ -27,6 +27,6 @@ demonstrated Task01 regression. Aggregate matched Task01 gates remain passed;
 restart samples do not replace their historical values.
 
 Full methods, adverse attempts, causal audit, hashes and raw evidence:
-`/home/mani/.local/state/kona/task01e-dock-20260912-143827/REPORT.md`.
+`~/.local/state/kona/task01e-dock-20260912-143827/REPORT.md`.
 Final acceptance: that directory's ACCEPTANCE.json supersedes the preserved earlier
 Task01 PARTIAL decision. Exact next task: **Task02 — Theme Engine**; not started.

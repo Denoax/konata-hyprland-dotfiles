@@ -1,8 +1,8 @@
 Auto-hide update: see [SIDEBAR_AUTOHIDE.md](SIDEBAR_AUTOHIDE.md). The visual revision below is preserved; Escape now hides while keeping the edge trigger armed, and `close` exits.
 
-# S04/S05 header revision — live review
+# S04/S05 header revision — accepted implementation history
 
-**READY FOR MANI — S04/S05 HEADER REVISION LIVE REVIEW**
+The installed header is accepted in the 2026-09-16 release checkpoint.
 
 Installed requested revision only: header identity lines are local `mani`, time-aware
 `Good evening.` and the real `Daily profile` label. The encouragement and quote are
@@ -23,7 +23,7 @@ motion. Existing profile watcher was not changed; its prior native validation re
 Native screenshots and 7.15s interaction clip inspected. Current native log is clean.
 Source/live scope audit passes; avatar, music popup and other product paths are unchanged.
 
-Evidence: `/home/mani/.local/state/kona/sidebar-header-revision-20260914/`.
+Evidence: `~/.local/state/kona/sidebar-header-revision-20260914/`.
 Review expanded.png, collapsed.png and expand-collapse.mp4 (silent). Native state,
 layer geometry, tests, audit, patch and backups are alongside them. User focus/cursor
 activity during capture was preserved; client geometry/workspaces/reservations match.
