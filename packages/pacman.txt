@@ -8,6 +8,7 @@ hyprlock
 hyprpaper
 hyprpolkitagent
 quickshell
+# Used for transient application/background scopes; the compositor session itself is plain Hyprland.
 uwsm
 waybar
 swaync

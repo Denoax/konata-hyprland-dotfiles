@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install portable test dependency
+        run: sudo apt-get update && sudo apt-get install -y rsync
+      - name: Shell syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          paths = [Path("install.sh")]
+          paths.extend(Path(".local/bin").glob("*"))
+          paths.extend(Path("tests").glob("*.sh"))
+          for path in paths:
+              if path.is_file() and path.read_bytes().splitlines()[0].startswith(b"#!/usr/bin/env bash"):
+                  subprocess.run(["bash", "-n", str(path)], check=True)
+          PY
+      - name: Python compile
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import py_compile
+          paths = list(Path("tests").glob("*.py")) + list(Path(".local/bin").glob("*"))
+          for path in paths:
+              if path.is_file() and b"python3" in path.read_bytes().splitlines()[0]:
+                  py_compile.compile(str(path), doraise=True)
+          PY
+      - name: Portable contract tests
+        run: |
+          set -e
+          for test in \
+            appearance.py event-state.py lockscreen.py mono-rain.py music-popup.py \
+            profiles.py repository.py rofi-surfaces.py runtime.py sidebar-host.py \
+            sidebar-navigation.py theme.py unified-menus.py v4.py \
+            wallpaper-theme.py waybar.py
+          do
+            python3 "tests/$test"
+          done
+      - name: Isolated recovery smoke
+        run: bash tests/recovery-smoke.sh

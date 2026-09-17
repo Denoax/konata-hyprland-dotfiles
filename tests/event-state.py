@@ -32,7 +32,8 @@ class EventState(unittest.TestCase):
         self.state = self.root / 'state'
         self.runtime.mkdir()
         self.env = dict(os.environ, HOME=str(self.home), XDG_RUNTIME_DIR=str(self.runtime),
-                        XDG_STATE_HOME=str(self.state), FIXTURE=str(self.root),
+                        XDG_STATE_HOME=str(self.state), XDG_CONFIG_HOME=str(self.home / '.config'),
+                        FIXTURE=str(self.root),
                         PATH=str(self.fake)+':'+os.environ['PATH'])
         self.clients = [dict(mapped=True, initialClass='kitty', **{'class':'kitty'},
                              workspace={'id':5},floating=True,fullscreen=0,at=[2000,100],size=[900,650])]
@@ -70,9 +71,10 @@ sys.exit(1 if (p/'waybar-absent').exists() else 0)
 ''')
         self.command('notify-send', '#!/bin/sh\nexit 0\n')
         # Preserve the real record worker but avoid OSD processes in this fixture.
-        (self.bin/'kona-osd').unlink()
-        (self.bin/'kona-osd').write_text('#!/bin/sh\nexit 0\n')
-        (self.bin/'kona-osd').chmod(0o755)
+        for name in ('kona-osd', 'kona-motion', 'kona-appearance'):
+            (self.bin/name).unlink()
+            (self.bin/name).write_text('#!/bin/sh\nexit 0\n')
+            (self.bin/name).chmod(0o755)
         install_profile_fakes(self.fake, self.root)
         profile_assets(self.home)
 

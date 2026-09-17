@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 install_deps=true
 restore_flatpaks=false
 dry_run=false
+config_only=false
 
 usage() {
   cat <<USAGE
@@ -22,7 +23,7 @@ USAGE
 
 for option in "$@"; do
   case "$option" in
-    --config-only) install_deps=false; restore_flatpaks=false ;;
+    --config-only) config_only=true ;;
     --skip-deps) install_deps=false ;;
     --with-flatpaks) restore_flatpaks=true ;;
     --skip-flatpaks) restore_flatpaks=false ;; # Compatibility with the old CLI.
@@ -31,6 +32,11 @@ for option in "$@"; do
     *) printf 'unknown option: %s\n' "$option" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if [[ "$config_only" == true ]]; then
+  install_deps=false
+  restore_flatpaks=false
+fi
 
 required_commands=(cp date find mkdir rsync)
 for command in "${required_commands[@]}"; do
@@ -122,5 +128,5 @@ if command -v systemctl >/dev/null 2>&1; then
 fi
 
 printf '\nConfiguration restored. Previous targets are backed up in:\n  %s\n' "$backup_root"
-printf 'Log out normally and select Hyprland, not Hyprland (uwsm-managed).\n'
+printf 'Log out normally and select the plain Hyprland session in PlasmaLogin.\n'
 printf 'Review %s/docs/INSTALL.md before the first login.\n' "$repo_root"
