@@ -3,9 +3,9 @@
 <br>
 
 > A three-display Arch Linux environment built around midnight blue, precise
-> motion, fast window control, and Konata's late-night gaming energy.
+> motion, fast window control, and Konata-Chan.
 
-This is the complete, real configuration—not a mockup. Hyprland is configured
+Hi guys i made this complete awesome configuration for Arch-Hyprland! Hyprland is configured
 in Lua and backed by a custom Waybar, auto-hiding dock, application launcher,
 media deck, audio controls, session restoration, workspace memory, capture
 tools, night light, gaming mode, and recovery workflow.
@@ -43,12 +43,12 @@ renders live PipeWire audio through CAVA.
 
 </details>
 
-## System map
+## System map (My Monitor Configuration)
 
 ```text
-SAMSUNG / HDMI-A-1        PIXIO / DP-4             ACER / HDMI-A-5
-1920×1080 @ 60 Hz         1920×1080 @ 240 Hz        1920×1080 @ 120 Hz
-workspaces 1 / 4 / 7      workspaces 2 / 5 / 8 / 10 workspaces 3 / 6 / 9
+SAMSUNG / HDMI-A-1        PIXIO / DP-4                    ACER / HDMI-A-5
+1920×1080 @ 60 Hz         1920×1080 @ 240 Hz              1920×1080 @ 120 Hz
+workspaces 1 / 4 / 7      workspaces 2 / 5 / 8 / 10       workspaces 3 / 6 / 9
 ```
 
 | Layer | Implementation |
