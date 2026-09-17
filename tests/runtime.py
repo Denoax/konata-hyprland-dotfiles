@@ -44,7 +44,10 @@ class Startup(unittest.TestCase):
         result = subprocess.run([str(ROOT / '.local/bin/kona-runtime-start')],
                                 env={**os.environ, 'HOME': str(self.home),
                                      'PATH': str(self.bin) + ':' + os.environ['PATH'],
-                                     'CALLS': str(self.log), 'MANAGED': str(int(managed)), 'FAIL': fail},
+                                     'CALLS': str(self.log), 'MANAGED': str(int(managed)), 'FAIL': fail,
+                                     'WAYLAND_DISPLAY': 'wayland-test',
+                                     'HYPRLAND_INSTANCE_SIGNATURE': 'test-signature',
+                                     'XDG_CURRENT_DESKTOP': 'Hyprland', 'XDG_SESSION_TYPE': 'wayland'},
                                 capture_output=True, text=True, timeout=10)
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         return result, calls
