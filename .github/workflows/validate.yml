@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install portable test dependency
-        run: sudo apt-get update && sudo apt-get install -y rsync
+        run: sudo apt-get update && sudo apt-get install -y lua5.4 rsync
       - name: Shell syntax
         run: |
           python3 - <<'PY'
@@ -49,5 +49,7 @@ jobs:
           do
             python3 "tests/$test"
           done
+      - name: Native Lua event contracts
+        run: lua5.4 tests/event-state.lua .config/hypr/hyprland.lua
       - name: Isolated recovery smoke
         run: bash tests/recovery-smoke.sh

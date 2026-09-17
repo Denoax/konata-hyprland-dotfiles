@@ -88,8 +88,12 @@ advance(1500)
 assert(#executed == before, 'close-side events must not resurrect closed windows')
 before = #executed; advance(180000)
 assert(#executed == before, 'closed windows must not leave timers running')
+local saves_before_shutdown = count('kona-session-save --quiet')
 callbacks['hyprland.shutdown']()
-assert(executed[#executed]:find('kona-session-save --quiet', 1, true))
+assert(count('kona-session-save --quiet') == saves_before_shutdown + 1,
+    'shutdown must save the current session')
+assert(count('systemctl --user stop hyprpolkitagent.service') == 1,
+    'shutdown must stop the packaged polkit owner before Wayland disconnects')
 assert(count('kona-runtime-start') == 0, 'ordinary events must not start resident owners')
 callbacks['hyprland.start']()
 assert(count('kona-runtime-start') == 1)
