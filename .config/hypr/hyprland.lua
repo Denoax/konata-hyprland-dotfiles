@@ -507,19 +507,6 @@ hl.window_rule({
     group = "new",
 })
 hl.window_rule({
-    name = "kona-dashboard-clock-left",
-    match = { initial_class = "^KonaDashboard$", initial_title = "^Kona::Clock$" },
-    workspace = "1 silent",
-    float = true,
-    size = { 620, 360 },
-    move = { 24, 56 },
-})
-hl.window_rule({
-    name = "kona-dashboard-grid-acer",
-    match = { initial_class = "^KonaDashboard$", initial_title = "^Kona::(System|Monitor|Matrix)$" },
-    workspace = "3 silent",
-})
-hl.window_rule({
     name = "fix-xwayland-drags",
     match = { class = "^$", title = "^$", xwayland = true, float = true, fullscreen = false, pin = false },
     no_focus = true,

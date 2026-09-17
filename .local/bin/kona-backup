@@ -1,63 +1,80 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+commit_snapshot=true
+push_snapshot=false
+for option in "$@"; do
+  case "$option" in
+    --no-commit) commit_snapshot=false ;;
+    --push) push_snapshot=true ;;
+    --help|-h)
+      printf 'usage: %s [--no-commit] [--push]\n' "$0"
+      printf 'Sync tracked Kona files from $HOME; commit locally by default.\n'
+      exit 0
+      ;;
+    *) printf 'unknown option: %s\n' "$option" >&2; exit 2 ;;
+  esac
+done
+
 repo_hint="${XDG_CONFIG_HOME:-$HOME/.config}/kona/backup-repo"
 if [[ -n "${KONA_DOTFILES_ROOT:-}" ]]; then
   repo_root="$KONA_DOTFILES_ROOT"
 elif [[ -s "$repo_hint" ]]; then
   repo_root="$(cat "$repo_hint")"
 else
-  repo_root="$HOME/Desktop/chat/hypr-konata-dotfiles"
-fi
-[[ -d "$repo_root" ]] || { printf 'Dotfiles repository not found: %s\n' "$repo_root" >&2; exit 1; }
-
-configs=(cava hypr kitty nwg-dock-hyprland nwg-drawer rofi swaync swayosd uwsm waybar xdg-desktop-portal)
-for config in "${configs[@]}"; do
-  [[ -d "$HOME/.config/$config" ]] || continue
-  mkdir -p "$repo_root/.config/$config"
-  rsync -a --delete "$HOME/.config/$config/" "$repo_root/.config/$config/"
-done
-# Service recovery is limited to the explicit Kona manifest. Never import or
-# delete unrelated user services (which may also contain private credentials).
-while IFS= read -r unit; do
-  relative=".config/systemd/user/$unit"
-  [[ -f "$HOME/$relative" ]] || continue
-  mkdir -p "$repo_root/$(dirname "$relative")"
-  cp -a "$HOME/$relative" "$repo_root/$relative"
-done < "$repo_root/packages/kona-user-units.txt"
-# Theme source and shipped fallback belong in recovery; runtime generations do not.
-if [[ -d "$HOME/.config/kona/theme" ]]; then
-  mkdir -p "$repo_root/.config/kona/theme"
-  rsync -a --delete --exclude=current --exclude=generations --exclude='.lock' \
-    --exclude='reload-pending.json' "$HOME/.config/kona/theme/" "$repo_root/.config/kona/theme/"
+  printf 'Kona repository is not configured. Set KONA_DOTFILES_ROOT or reinstall from a clone.\n' >&2
+  exit 1
 fi
 
-rsync -a --delete --include='kona-*' --include='nwg-dock-hyprland-kona' --exclude='*' \
-  "$HOME/.local/bin/" "$repo_root/.local/bin/"
-mkdir -p "$repo_root/.local/share/applications" "$repo_root/.local/share/wallpapers"
-rsync -a "$HOME/.local/share/applications/kona-search.desktop" "$repo_root/.local/share/applications/"
-rsync -a "$HOME/.local/share/wallpapers/konata-command-center/" \
-  "$repo_root/.local/share/wallpapers/konata-command-center/"
+git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+  printf 'Not a Git working tree: %s\n' "$repo_root" >&2
+  exit 1
+}
 
-mkdir -p "$repo_root/packages"
-{ pacman -Qqen || true; } | sort > "$repo_root/packages/pacman.txt"
-{ pacman -Qqem || true; } | sort > "$repo_root/packages/aur.txt"
-{ flatpak list --app --columns=application || true; } | sort > "$repo_root/packages/flatpak.txt"
-{ systemctl --user list-unit-files --state=enabled --no-legend 2>/dev/null || true; } | awk '{print $1}' | sort > "$repo_root/packages/user-units.txt"
-
-git -C "$repo_root" add .
-if ! git -C "$repo_root" diff --cached --quiet; then
-  git -C "$repo_root" commit -m "Backup Konata desktop $(date +%Y-%m-%d)"
+if [[ -n "$(git -C "$repo_root" status --porcelain)" ]]; then
+  printf 'Repository already has changes; refusing to mix them into an automatic checkpoint.\n' >&2
+  printf 'Review %s, then rerun kona-backup.\n' "$repo_root" >&2
+  exit 1
 fi
 
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  if ! git -C "$repo_root" remote get-url origin >/dev/null 2>&1; then
-    gh repo create konata-hyprland-dotfiles --private --source "$repo_root" --remote origin --push
-  else
-    git -C "$repo_root" push -u origin main
+missing=0
+while IFS= read -r -d '' relative; do
+  [[ "$relative" != '.config/kona/theme/current' ]] || continue
+  source="$HOME/$relative"
+  destination="$repo_root/$relative"
+  if [[ ! -e "$source" && ! -L "$source" ]]; then
+    printf 'Skipping absent live path: %s\n' "$relative" >&2
+    missing=$((missing + 1))
+    continue
   fi
-  notify-send -a 'Kona Backup' 'Backup complete' 'Local snapshot committed and pushed to the private GitHub repository.'
-else
-  notify-send -a 'Kona Backup' 'Local backup complete' 'GitHub login is required before the private copy can be pushed.'
-  printf 'Local backup complete. Run gh auth login, then run kona-backup again to push it.\n'
+  mkdir -p "$(dirname "$destination")"
+  rsync -a -- "$source" "$destination"
+done < <(git -C "$repo_root" ls-files -z -- .config .local/bin .local/share)
+
+if git -C "$repo_root" diff --quiet -- .config .local/bin .local/share; then
+  notify-send -a 'Kona Backup' 'No changes' 'Tracked Kona files already match the repository.' 2>/dev/null || true
+  printf 'Tracked Kona files already match %s.\n' "$repo_root"
+  exit 0
 fi
+
+git -C "$repo_root" diff --check
+if [[ "$commit_snapshot" == false ]]; then
+  printf 'Synced tracked Kona files into %s; changes are uncommitted.\n' "$repo_root"
+  exit 0
+fi
+
+git -C "$repo_root" add --update -- .config .local/bin .local/share
+git -C "$repo_root" commit -m "chore: checkpoint Kona desktop $(date +%Y-%m-%d)"
+
+if [[ "$push_snapshot" == true ]]; then
+  git -C "$repo_root" remote get-url origin >/dev/null 2>&1 || {
+    printf 'No origin remote is configured; local checkpoint was retained.\n' >&2
+    exit 1
+  }
+  git -C "$repo_root" push origin HEAD
+fi
+
+message='Local checkpoint created.'
+[[ "$push_snapshot" == false ]] || message='Local checkpoint created and pushed.'
+notify-send -a 'Kona Backup' 'Backup complete' "$message" 2>/dev/null || true
+printf '%s Missing live paths: %s\n' "$message" "$missing"

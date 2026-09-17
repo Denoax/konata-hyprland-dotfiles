@@ -1,4 +1,0 @@
-@import "../kona/theme/current/rofi.rasi"
-window { background-color: @bg; border: 1px; border-color: @outline; border-radius: 14px; }
-element { border-radius: 10px; padding: 9px 11px; }
-element selected { background-color: @accent-soft; text-color: @fg; }

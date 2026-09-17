@@ -26,6 +26,8 @@ class MonoRain(unittest.TestCase):
         self.assertIn("static_fallback_for", profile)
         self.assertIn("preserve_theme_for", profile)
         self.assertTrue(scene['animated'].endswith('/konata-mono-rain.gif'))
+        self.assertTrue(scene['animated'].startswith('~/'))
+        self.assertIn('expanduser()', wallpaper)
         self.assertNotIn('mpvpaper', wallpaper)
         self.assertNotIn('swww', wallpaper)
 

@@ -199,6 +199,7 @@ def generate_theme(mode):
         return
     root = HOME / '.local/share/wallpapers/konata-command-center'
     custom = read_json(SCENE_IMAGES, {}).get(mode)
+    custom = str(Path(custom).expanduser()) if custom else None
     if custom and preserve_theme_for(Path(custom)):
         return
     representative = static_fallback_for(Path(custom)) if custom and mode == 'animated' else (Path(custom) if custom else root / {'simple': 'v2/selected.png', 'static': 'center.png', 'animated': 'animated/center.webp'}[mode])

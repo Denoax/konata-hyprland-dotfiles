@@ -14,7 +14,8 @@ home=Path.home()
 page=sys.argv[1] if len(sys.argv)>1 else 'deck'
 if page not in ('deck','studio','wallpapers','shortcuts','mosaic','close'):sys.exit('Unknown Kona surface')
 config=Path(os.environ.get('KONA_SHELL_CONFIG',home/'.config/quickshell/kona'))
-pkg=home/'.local/opt/kona-pkgs/quickshell-0.3.1/usr'
+packages=(home/'.local/opt/kona-pkgs/quickshell/usr',home/'.local/opt/kona-pkgs/quickshell-0.3.1/usr')
+pkg=next((path for path in packages if (path/'bin/quickshell').is_file()),packages[0])
 exe=shutil.which('quickshell') or str(pkg/'bin/quickshell')
 if not Path(exe).is_file():
     fallback='kona-wallpaper-menu' if page=='wallpapers' else 'kona-quick-settings'

@@ -24,6 +24,12 @@ def read(path, default):
     try: return json.loads(path.read_text())
     except FileNotFoundError: return default
 
+def configured_image(mode):
+    fallback=HOME/'.local/share/wallpapers/konata-command-center'/ {
+        'simple':'v2/selected.png','static':'center.png','animated':'animated/center.webp'
+    }[mode]
+    return Path(read(CONFIG/'scene-images.json',{}).get(mode,str(fallback))).expanduser()
+
 def atomic(path, data):
     path.parent.mkdir(parents=True,exist_ok=True)
     fd,name=tempfile.mkstemp(prefix='.'+path.name,dir=path.parent)
@@ -125,7 +131,7 @@ def snapshot():
         except (RuntimeError,OSError,subprocess.SubprocessError):versions[name]='Unavailable'
     state=status()
     mode=state['wallpaper']['mode']
-    selected=Path(read(CONFIG/'scene-images.json',{}).get(mode,str(HOME/'.local/share/wallpapers/konata-command-center'/ {'simple':'v2/selected.png','static':'center.png','animated':'animated/center.webp'}[mode])))
+    selected=configured_image(mode)
     try: appearance=json.loads(run([BIN/'kona-appearance','status']))
     except (ValueError,RuntimeError,subprocess.SubprocessError): appearance={}
     return {'state':state,'currentImage':str(selected),'currentImageUrl':selected.as_uri(),'prefs':preferences(),'tokens':read(CONFIG/'theme/current/tokens.json',{}),'appearance':appearance,
@@ -163,7 +169,7 @@ def action(name,value):
         if value=='cyan':run([BIN/'kona-theme','--default'])
         else:
             mode=json.loads(run([BIN/'kona-profile','status']))['wallpaper']['mode']
-            image=read(CONFIG/'scene-images.json',{}).get(mode,str(HOME/'.local/share/wallpapers/konata-command-center'/ {'simple':'v2/selected.png','static':'center.png','animated':'animated/center.webp'}[mode]))
+            image=str(configured_image(mode))
             run([BIN/'kona-theme','--image',image])
         pref_update({'accent':value});return value
     if name=='favorite':

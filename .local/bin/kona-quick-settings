@@ -45,7 +45,7 @@ case "$choice" in
   *'Screen recording'*) "$HOME/.local/bin/kona-record" output ;;
   *'Workspace overview'*) "$HOME/.local/bin/kona-overview" ;;
   *'Updates and rollback'*) "$HOME/.local/bin/kona-updates" ;;
-  *'Backup now'*) "$HOME/.local/bin/kona-confirm" 'Sync, commit, and push desktop backup?' 'Sync, commit, and push' && "$HOME/.local/bin/kona-backup" ;;
+  *'Backup now'*) "$HOME/.local/bin/kona-confirm" 'Sync Kona files and create a local checkpoint?' 'Create local checkpoint' && "$HOME/.local/bin/kona-backup" ;;
   *'Network connections'*) "$HOME/.local/bin/kona-network-menu" ;;
   *'Bluetooth devices'*) "$HOME/.local/bin/kona-bluetooth-menu" ;;
   *'System settings'*) uwsm app -- systemsettings >/dev/null 2>&1 & ;;

@@ -1,0 +1,8 @@
+# Mani's current host only. Do not install this list blindly.
+# CPU: Intel; primary graphics path: NVIDIA; PlasmaLogin is provided by Plasma.
+intel-ucode
+libva-nvidia-driver
+linux
+linux-firmware
+nvidia-open
+plasma-meta

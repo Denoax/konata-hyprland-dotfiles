@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Kona Shortcuts
-Comment=Kona V4 — Shortcuts
+Comment=Kona keyboard reference
 Exec=kona-shell shortcuts
 Icon=help-browser
 Terminal=false

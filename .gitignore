@@ -15,9 +15,6 @@ __pycache__/
 !.config/kona/theme/default/tokens.json
 !.config/kona/menus/tokens/
 !.config/kona/menus/tokens/*.json
-!.config/quickshell/kona/sidebar/tokens/
-!.config/quickshell/kona/sidebar/tokens/*.json
-!.config/quickshell/kona/sidebar/tokens/*.css
 .config/kona/theme/generations/
 .config/kona/theme/.lock
 .config/kona/theme/reload-pending.json

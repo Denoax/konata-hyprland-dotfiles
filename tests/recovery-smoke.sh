@@ -6,6 +6,14 @@ sandbox="$(mktemp -d -t kona-recovery-XXXXXX)"
 trap 'gio trash "$sandbox" >/dev/null 2>&1 || true' EXIT
 test_home="$sandbox/home"
 mkdir -p "$test_home"
+
+# A dry run must describe the real plain-session scope without touching HOME.
+dry_home="$sandbox/dry-home"
+dry_output="$(HOME="$dry_home" XDG_CONFIG_HOME="$dry_home/.config" \
+  XDG_STATE_HOME="$dry_home/.local/state" "$repo_root/install.sh" --dry-run --config-only)"
+[[ ! -e "$dry_home" ]]
+[[ "$dry_output" == *'PlasmaLogin -> Hyprland'* ]]
+[[ "$dry_output" != *'nwg-dock'* && "$dry_output" != *'nwg-drawer'* ]]
 mkdir -p "$test_home/.config/systemd/user"
 printf 'unrelated user service\n' > "$test_home/.config/systemd/user/unrelated.service"
 printf 'old Kona unit\n' > "$test_home/.config/systemd/user/kona-automount.service"
@@ -51,7 +59,6 @@ required=(
   '.local/bin/kona-waybar-refresh'
   '.local/bin/kona-state'
   '.local/bin/kona-theme'
-  '.config/kona/theme/palette.json'
   '.config/kona/theme/current/tokens.json'
   '.config/kona/theme/current/appearance.json'
   '.config/kona/theme/current/waybar.css'
@@ -60,7 +67,8 @@ required=(
   '.config/kona/theme/current/rofi.rasi'
   '.config/kona/theme/current/kitty.conf'
   '.config/kona/theme/current/hyprland.colors'
-  '.local/bin/nwg-dock-hyprland-kona'
+  '.local/bin/kona-runtime-health'
+  '.config/kona/wallpapers/konata-mono-rain/render/konata-mono-rain.gif'
   '.local/share/wallpapers/konata-command-center/v2/selected.png'
 )
 
@@ -76,11 +84,13 @@ while IFS= read -r unit; do
   cmp -s "$repo_root/.config/systemd/user/$unit" "$test_home/.config/systemd/user/$unit"
 done < "$repo_root/packages/kona-user-units.txt"
 [[ "$(cat "$test_home/.config/systemd/user/unrelated.service")" == 'unrelated user service' ]]
-old_units=("$test_home"/.local/state/kona/pre-restore-*/config/systemd/user/kona-automount.service)
+old_units=("$test_home"/.local/state/kona/pre-restore-*/.config/systemd/user/kona-automount.service)
 [[ ${#old_units[@]} == 1 && "$(cat "${old_units[0]}")" == 'old Kona unit' ]]
 cmp -s "$repo_root/.config/hypr/hyprland.lua" "$test_home/.config/hypr/hyprland.lua"
-cmp -s "$repo_root/.local/bin/nwg-dock-hyprland-kona" "$test_home/.local/bin/nwg-dock-hyprland-kona"
 [[ "$(cat "$test_home/.config/kona/backup-repo")" == "$repo_root" ]]
+[[ ! -e "$test_home/.local/bin/nwg-dock-hyprland-kona" ]]
+[[ ! -e "$test_home/.config/nwg-dock-hyprland" ]]
+[[ ! -e "$test_home/.config/nwg-drawer" ]]
 
 HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" \
   "$test_home/.local/bin/kona-theme" --default --no-reload >/dev/null

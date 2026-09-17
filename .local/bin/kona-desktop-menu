@@ -68,7 +68,7 @@ case "$choice" in
   'Quick Settings') ~/.local/bin/kona-quick-settings ;;
   'Updates') ~/.local/bin/kona-updates ;;
   'Night Light') ~/.local/bin/kona-night-light toggle && ~/.local/bin/kona-menu-sound ;;
-  'Backup Now') ~/.local/bin/kona-confirm 'Sync, commit, and push desktop backup?' 'Sync, commit, and push' && ~/.local/bin/kona-backup ;;
+  'Backup Now') ~/.local/bin/kona-confirm 'Sync Kona files and create a local checkpoint?' 'Create local checkpoint' && ~/.local/bin/kona-backup ;;
   'Profiles') ~/.local/bin/kona-profile-menu ;;
   'Wallpapers') ~/.local/bin/kona-wallpaper-menu ;;
   'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;

@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Kona Sidebar
-Comment=Review the Kona sidebar foundation
+Comment=Open the Kona navigation sidebar
 Exec=kona-sidebar show
 Icon=view-sidetree
 Terminal=false

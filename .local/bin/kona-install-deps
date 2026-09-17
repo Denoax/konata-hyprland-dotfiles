@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-packages=(swayosd satty wf-recorder hyprsunset)
+packages=(swayosd satty wf-recorder hyprsunset quickshell)
 cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/kona-user-packages"
 install_root="$HOME/.local/opt/kona-pkgs"
 mkdir -p "$cache_root" "$install_root"
@@ -21,4 +21,3 @@ for package in "${packages[@]}"; do
 done
 
 printf 'Kona user-local dependencies installed in %s\n' "$install_root"
-

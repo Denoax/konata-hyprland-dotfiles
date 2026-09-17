@@ -1,3 +1,4 @@
+# Optional personal applications. install.sh reads this only with --with-flatpaks.
 com.brave.Browser
 com.discordapp.Discord
 com.github.finefindus.eyedropper

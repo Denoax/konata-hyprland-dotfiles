@@ -30,7 +30,8 @@ custom_image="${preview_image:-$(python3 - "$mode" <<'PYIMAGE'
 import json,os,sys
 from pathlib import Path
 p=Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home()/'.config')))/'kona/scene-images.json'
-print(json.loads(p.read_text()).get(sys.argv[1], '') if p.exists() else '')
+value=json.loads(p.read_text()).get(sys.argv[1], '') if p.exists() else ''
+print(Path(value).expanduser() if value else '')
 PYIMAGE
 )}"
 if [[ -n "$custom_image" ]]; then
