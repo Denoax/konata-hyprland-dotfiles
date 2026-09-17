@@ -27,8 +27,10 @@ preserves the accepted overview, including its existing tall layout on 1080p.
 The wallpaper selector lists only complete installed sets and delegates to
 `kona-wallpaper`; it does not own wallpaper state or implement arbitrary-image
 profiles. It reuses Rofi's installed glycin thumbnailer/cache with a direct-image
-fallback. The existing category navigation in `nwg-drawer` remains a unique dock
-workflow, so the drawer and canonical dock are retained unchanged.
+fallback. At this Task05 checkpoint, category navigation in `nwg-drawer` was still a
+unique dock workflow, so both were retained. The later sidebar-navigation pass and
+2026-09-16 release superseded that decision: the sidebar/Rofi now provide the behavior,
+and the dock/drawer product paths are retired.
 
 Audio selectors use Rofi's original row index, avoiding ambiguity between repeated
 device descriptions or app names. Clipboard selection uses a private temporary

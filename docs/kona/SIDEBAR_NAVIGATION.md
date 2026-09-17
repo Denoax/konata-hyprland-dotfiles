@@ -18,9 +18,10 @@ The retired dock exposed ordinary running-window buttons plus two cached pins:
 launch is covered by All Apps, and running/focused windows are now represented directly.
 Existing Hyprland controls continue to own floating, fullscreen, close, move, and other
 window operations. After launch/focus parity was proven, `nwg-dock-hyprland` PID 1854828
-was stopped. Hyprland startup now starts the sidebar instead of the dock. The dock binary,
-style, cache, launcher script, and the historical 44.694 MiB alarm remain intact for
-evidence and rollback; no dock process remains in normal DAILY runtime.
+was stopped. Hyprland startup now starts the sidebar instead of the dock. At this
+historical checkpoint the dock binary, style, cache and launcher remained available for
+rollback. The 2026-09-16 release cleanup later removed those product paths; the historical
+44.694 MiB alarm remains in documentation and the exact old tree remains on the legacy branch.
 
 A bare Super press/release toggles the existing sidebar latch. Every existing Super chord
 continues through the established `bindSuper` guard, which disarms the bare-key action as
@@ -77,10 +78,10 @@ Evidence and pre-change source/live backups are under
 - `evidence/navigation-candidate-final-memory.txt`
 - `evidence/final-runtime-post-fix.txt`
 
-Rollback restores the corresponding `backup/repo` and `backup/live` paths, reloads the
-Hyprland config, and restarts only the sidebar. The retained `kona-dock` launcher can then
-be started if the navigation pass itself is rolled back. No compositor or unrelated
-service restart is required.
+The original task rollback restored the corresponding `backup/repo` and `backup/live`
+paths, reloaded the Hyprland config, and restarted only the sidebar. The current public
+tree no longer ships `kona-dock`; use the frozen legacy branch when investigating that
+generation. No compositor or unrelated service restart was required.
 
 Branch `kona-v3/task01-event-state`, HEAD
 `dac844f554e37eef9368fbf26860be65237422de`; the accepted dirty tree is preserved. No
