@@ -9,31 +9,32 @@ Item {
     property color accent: Appearance.accent
     property real minBarHeight: 5
     property real maxBarHeight: 46
+    property real barWidth: 6
+    property real barSpacing: 6
 
     implicitWidth: 230
     implicitHeight: 52
 
     Row {
-        anchors.fill: parent
-        spacing: 7
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.centerIn: parent
+        spacing: root.barSpacing
 
         Repeater {
             model: root.values ? root.values.length : 0
 
             Rectangle {
                 required property int index
-                width: 4
-                radius: 2
+                width: root.barWidth
+                radius: width / 2
                 height: root.active
-                        ? root.minBarHeight + (root.maxBarHeight - root.minBarHeight) * Math.max(0, Math.min(1, Number(root.values[index])))
+                        ? root.minBarHeight + (root.maxBarHeight - root.minBarHeight) * Math.min(1, Math.max(0, Number(root.values[index])) * 2.35)
                         : root.minBarHeight
                 color: root.accent
-                opacity: root.active ? 0.86 : 0.28
+                opacity: root.active ? 0.92 : 0.34
                 anchors.verticalCenter: parent.verticalCenter
 
                 Behavior on height {
-                    NumberAnimation { duration: 95; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: 135; easing.type: Easing.OutCubic }
                 }
                 Behavior on opacity { NumberAnimation { duration: 140 } }
             }

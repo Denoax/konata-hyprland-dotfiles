@@ -1,0 +1,101 @@
+{
+  "master_canvas": [
+    2172,
+    724
+  ],
+  "reference": "reference/MUSIC_APPROVED_MASTER.png",
+  "runtime_target_1080p": {
+    "width": 1260,
+    "height": 420,
+    "scale_from_master": 0.5801,
+    "visible_shell_height_approx": 210,
+    "rule": "Do not return to the 1800px-wide implementation. Target 1180-1320px wide at 1080p."
+  },
+  "shell": "music/shell/music_shell_light.png",
+  "dark_shell": "music/shell/music_shell_dark.png",
+  "master_positions": {
+    "album_art_clip": [
+      130,
+      207,
+      260,
+      260
+    ],
+    "metadata": [
+      450,
+      225,
+      410,
+      185
+    ],
+    "seek_bar": [
+      455,
+      385,
+      480,
+      26
+    ],
+    "timestamps": [
+      455,
+      420,
+      490,
+      42
+    ],
+    "shuffle": [
+      965,
+      300,
+      52,
+      52
+    ],
+    "previous": [
+      1030,
+      292,
+      66,
+      66
+    ],
+    "play_pause": [
+      1110,
+      270,
+      100,
+      100
+    ],
+    "next": [
+      1230,
+      292,
+      66,
+      66
+    ],
+    "repeat": [
+      1310,
+      300,
+      52,
+      52
+    ],
+    "waveform": [
+      1450,
+      260,
+      250,
+      115
+    ],
+    "speaker": [
+      1765,
+      305,
+      55,
+      55
+    ],
+    "volume_slider": [
+      1830,
+      316,
+      230,
+      28
+    ]
+  },
+  "album_bubble": {
+    "outer_reference_asset": "music/art/kona_bubble_reference.png",
+    "shell_aperture": "Use real MPRIS artwork clipped into the album aperture; bubble shell/background comes from the provided shell PNG.",
+    "satellite_bubbles": [
+      "music/ui/bubble_large.png",
+      "music/ui/bubble_medium.png",
+      "music/ui/bubble_small.png",
+      "music/ui/bubble_tiny.png"
+    ]
+  },
+  "data_rule": "Song title/artist/artwork/timestamps/CAVA remain real MPRIS/CAVA values. Example labels are typography guides only."
+}

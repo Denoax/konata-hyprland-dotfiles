@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Launch a Kona-styled Fish shell using the active semantic appearance."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tempfile
+
+
+def colour(value: object, fallback: str) -> str:
+    return str(value).lstrip("#") if isinstance(value, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", value) else fallback
+
+
+def appearance() -> dict[str, str]:
+    root = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+    try:
+        source = json.loads((root / "kona/theme/current/appearance.json").read_text())
+    except (OSError, ValueError, json.JSONDecodeError):
+        source = {}
+    return {
+        "accent": colour(source.get("accent"), "7FAEFF"),
+        "text": colour(source.get("text"), "EAF2FF"),
+        "secondary": colour(source.get("text_secondary"), "B6C4D9"),
+        "muted": colour(source.get("text_muted"), "8393AA"),
+        "success": colour(source.get("success"), "43D5A0"),
+        "danger": colour(source.get("danger"), "FF7C88"),
+    }
+
+
+def fish_binary() -> Path:
+    candidates = (
+        Path.home() / ".local/opt/kona-pkgs/fish/usr/bin/fish",
+        Path(shutil.which("fish") or "/missing/fish"),
+    )
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    raise SystemExit("kona-scratch-shell: Fish is unavailable; run kona-install-deps")
+
+
+def render_config(palette: dict[str, str], kind: str = "scratch") -> str:
+    if kind not in {"scratch", "terminal"}:
+        raise ValueError(f"unsupported shell kind: {kind}")
+    history = "kona_scratch" if kind == "scratch" else "kona_terminal"
+    label = "scratch" if kind == "scratch" else os.environ.get("USER", "terminal")
+    title = "scratch" if kind == "scratch" else "terminal"
+    return f'''set -g fish_greeting
+set -g fish_history {history}
+set -g fish_color_command {palette["text"]} --bold
+set -g fish_color_param {palette["secondary"]}
+set -g fish_color_operator {palette["accent"]}
+set -g fish_color_quote {palette["success"]}
+set -g fish_color_error {palette["danger"]}
+set -g fish_color_autosuggestion {palette["muted"]} --dim
+set -g fish_color_search_match --background={palette["accent"]} {palette["text"]}
+set -g fish_pager_color_prefix {palette["accent"]} --bold
+set -g fish_pager_color_completion {palette["secondary"]}
+set -g fish_pager_color_description {palette["muted"]} --dim
+
+function fish_mode_prompt
+end
+
+function fish_title
+    printf '{title} · %s' (prompt_pwd --full-length-dirs 2)
+end
+
+function fish_prompt
+    set -l previous_status $status
+    printf '\n'
+    set_color {palette["accent"]} --bold
+    printf '╭─'
+    set_color {palette["muted"]}
+    printf ' {label} '
+    set_color {palette["accent"]}
+    printf 'in '
+    set_color {palette["text"]} --bold
+    printf '%s' (prompt_pwd --full-length-dirs 2)
+    if test $previous_status -ne 0
+        set_color {palette["danger"]}
+        printf '  [%s]' $previous_status
+    end
+    printf '\n'
+    set_color {palette["accent"]} --bold
+    printf '╰─❯ '
+    set_color normal
+end
+
+function fish_right_prompt
+    set_color {palette["muted"]} --dim
+    date '+%H:%M'
+    set_color normal
+end
+'''
+
+
+def main() -> None:
+    kind = sys.argv[1] if len(sys.argv) > 1 else "scratch"
+    if kind not in {"scratch", "terminal"}:
+        raise SystemExit("usage: kona-scratch-shell [scratch|terminal]")
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / f"kona-{kind}"
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    destination = runtime / "config.fish"
+    descriptor, temporary = tempfile.mkstemp(prefix="config.", dir=runtime)
+    try:
+        with os.fdopen(descriptor, "w") as stream:
+            stream.write(render_config(appearance(), kind))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    binary = fish_binary()
+    os.execve(binary, [str(binary), "--no-config", "--init-command", f'source "{destination}"'], os.environ.copy())
+
+
+if __name__ == "__main__":
+    main()

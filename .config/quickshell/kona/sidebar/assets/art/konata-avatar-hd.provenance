@@ -1,6 +1,7 @@
-Historical source: ~/.local/share/wallpapers/konata-command-center/v2/selected.png (retired after crop verification)
-Source dimensions: 1920x1080
-Crop: 720x720 at x=0, y=40
-Purpose: native sidebar identity avatar
-Method: lossless crop only; no upscaling or generated replacement
-Recorded: 2026-09-15
+Source: user-supplied local file db165a0b1e0902996feaf8ff2d1f6265.jpg
+Source SHA-256: 798bc7b77510067bfcb72c675aabde4c46913fb9d5c613e773a00e9a1900d383
+Source dimensions: 470x442
+Crop: centered 442x442 crop at x=14, y=0
+Runtime asset: 720x720 PNG, Lanczos resize with light output sharpening
+Purpose: canonical Kona profile avatar for the sidebar and Quickshell surfaces
+Recorded: 2026-09-17

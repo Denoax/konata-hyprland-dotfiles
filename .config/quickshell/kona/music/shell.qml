@@ -105,18 +105,6 @@ ShellRoot {
             focus: true
             Keys.onEscapePressed: root.close()
             MouseArea { anchors.fill: parent; onClicked: root.close() }
-            // Separate blue perimeter glow preserves the existing neutral drop shadow.
-            RectangularShadow {
-                x: popup.x; y: popup.y
-                width: popup.width; height: popup.height
-                radius: popup.radius
-                color: Qt.rgba(popup.accent.r, popup.accent.g, popup.accent.b, 0.20)
-                blur: 36
-                spread: 4
-                scale: popup.scale
-                transformOrigin: Item.Top
-                opacity: popup.opacity
-            }
             MusicPopupView {
                 id: popup
                 x: (parent.width - width) / 2
@@ -124,7 +112,7 @@ ShellRoot {
                 transformOrigin: Item.Top
                 scale: Math.min(1, (parent.width - 32) / width, (parent.height - 36) / height) * (0.97 + root.progress * 0.03)
                 opacity: root.progress
-                layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.65; shadowOpacity: 0.22; shadowVerticalOffset: 10 }
+                layer.effect: MultiEffect { shadowEnabled: true; shadowBlur: 0.48; shadowOpacity: 0.16; shadowVerticalOffset: 8 }
                 // The supplied composition owns all content. Catch only unused panel
                 // space, letting the supplied controls handle their own pointer input.
                 MouseArea { anchors.fill: parent; z: -1; onClicked: popup.forceActiveFocus() }

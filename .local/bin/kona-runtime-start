@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Invoked once by hyprland.start, never by config reload. A UWSM app scope alone
 # is not a managed session: check the compositor, not merely installed binaries.
-if ! "$HOME/.local/bin/kona-runtime-health" owner; then
+if ! "$HOME/.local/bin/kona-runtime-health" wait-owner --timeout 5; then
   printf 'Kona: another Hyprland instance owns this login session; skipping duplicate session startup.\n' >&2
   exit 0
 fi

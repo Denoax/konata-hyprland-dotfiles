@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "Your city",
+  "region": "Your region",
+  "latitude": 0.0,
+  "longitude": 0.0,
+  "units": "metric",
+  "refresh_minutes": 30
+}

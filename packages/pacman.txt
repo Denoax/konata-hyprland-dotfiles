@@ -15,6 +15,9 @@ swaync
 swayosd
 rofi
 kitty
+btop
+fastfetch
+fish
 
 # Desktop integration
 xdg-desktop-portal-hyprland

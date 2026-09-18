@@ -46,7 +46,7 @@ for command in "${required_commands[@]}"; do
   }
 done
 
-config_roots=(hypr kitty kona quickshell rofi swaync swayosd systemd waybar xdg-desktop-portal)
+config_roots=(btop cava fastfetch hypr kitty kona quickshell rofi swaync swayosd systemd waybar xdg-desktop-portal)
 
 print_plan() {
   cat <<PLAN
@@ -54,7 +54,7 @@ Kona restore plan
   source: $repo_root
   configuration: ${config_roots[*]}
   executables: .local/bin/kona-*
-  shared data: Kona desktop entries and wallpaper assets
+  shared data: Kona desktop entries, wallpaper assets and account avatar
   dependencies: $install_deps
   optional Flatpaks: $restore_flatpaks
   session: PlasmaLogin -> Hyprland (plain /usr/bin/start-hyprland)
@@ -103,6 +103,13 @@ done < <(find "$repo_root/.local/bin" -maxdepth 1 -type f -print0)
 
 if [[ -d "$repo_root/.local/share" ]]; then
   rsync -a "$repo_root/.local/share/" "$HOME/.local/share/"
+fi
+
+if [[ -f "$repo_root/.local/share/kona/avatar.png" ]]; then
+  backup_target ".face.icon"
+  backup_target ".face"
+  install -m 0644 "$repo_root/.local/share/kona/avatar.png" "$HOME/.face.icon"
+  install -m 0644 "$repo_root/.local/share/kona/avatar.png" "$HOME/.face"
 fi
 
 mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/kona"

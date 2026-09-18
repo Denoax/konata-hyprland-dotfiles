@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="474" height="300" viewBox="0 0 474 300">
+<image href="surfaces/hero_glass.png" x="0" y="0" width="474" height="300"/>
+<image href="art/hero_kona.png" x="162" y="8" width="286" height="286" preserveAspectRatio="none"/>
+<image href="text/speech_still_watching.png" x="26" y="60" width="230" height="98" preserveAspectRatio="none"/>
+<image href="text/kona_signature.png" x="24" y="224" width="116" height="58" preserveAspectRatio="none"/>
+<image href="decor/moon_badge.png" x="122" y="188" width="30" height="30"/>
+<image href="decor/sparkles.png" x="20" y="56" width="70" height="52"/>
+</svg>

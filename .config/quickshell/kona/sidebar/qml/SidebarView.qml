@@ -10,6 +10,7 @@ Item {
     property bool revealed: false
     readonly property bool controlFocused: collapseControl.activeFocus
     property var player: null
+    property var weather: ({status: "loading"})
     property var workspaces: []
     property var applications: []
     property var runningApplications: []
@@ -81,8 +82,12 @@ Item {
                         width: parent.width; player: root.player
                         onRequest: (id, args) => root.request(id, args)
                     }
+                    WeatherCompact {
+                        width: parent.width; weather: root.weather
+                        onRequest: (id, args) => root.request(id, args)
+                    }
                     ActionSection {
-                        width: parent.width; title: "Quick controls"; iconName: "sun"; expanded: true
+                        width: parent.width; title: "Quick controls"; iconName: "wrench"; expanded: true
                         showAppearance: true
                         appearanceMode: Tokens.appearanceMode
                         entries: [
@@ -148,9 +153,10 @@ Item {
             Repeater {
                 model: [
                     {icon: "music", action: "music.open", label: "Music"},
+                    {icon: "sun", action: "weather.open", label: "Weather"},
                     {icon: "apps", action: "applications.open", label: "Applications"},
                     {icon: "workspaces", action: "overview.open", label: "Workspaces"},
-                    {icon: "sun", action: "controls.open", label: "Quick controls"},
+                    {icon: "wrench", action: "controls.open", label: "Quick controls"},
                     {icon: "bell", action: "notifications.open", label: "Notifications"},
                     {icon: "settings", action: "settings.open", label: "Settings"}
                 ]

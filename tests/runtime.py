@@ -7,6 +7,7 @@ import runpy
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 HEALTH = runpy.run_path(str(ROOT / '.local/bin/kona-runtime-health'))
@@ -55,7 +56,7 @@ class Startup(unittest.TestCase):
     def test_managed_start_finalizes_before_services_and_defers_trays_to_xdg(self):
         result, calls = self.invoke()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls[:3], [['kona-runtime-health', 'owner'],
+        self.assertEqual(calls[:3], [['kona-runtime-health', 'wait-owner', '--timeout', '5'],
                                     ['uwsm', 'check', 'is-active', 'hyprland.desktop'],
                                     ['uwsm', 'finalize']])
         self.assertIn(['uwsm', 'app', '-s', 's', '-t', 'scope', '-u', 'kona-waybar', '--', 'waybar'], calls)
@@ -105,11 +106,11 @@ class Startup(unittest.TestCase):
 
     def test_noncanonical_hyprland_does_not_launch_duplicate_session_owners(self):
         health = self.home / '.local/bin/kona-runtime-health'
-        health.write_text(SHIM + "\nif sys.argv[1:]==['owner']:sys.exit(1)\n")
+        health.write_text(SHIM + "\nif sys.argv[1:]==['wait-owner','--timeout','5']:sys.exit(1)\n")
         health.chmod(0o755)
         result, calls = self.invoke(managed=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls, [['kona-runtime-health', 'owner']])
+        self.assertEqual(calls, [['kona-runtime-health', 'wait-owner', '--timeout', '5']])
         self.assertIn('skipping duplicate session startup', result.stderr)
 
     def test_service_failure_remains_failure_without_legacy_duplicate_launches(self):
@@ -170,6 +171,16 @@ class PolkitHealth(unittest.TestCase):
     def test_stale_wayland_environment_fails(self):
         stale = [{'pid': 42, 'environment': dict(self.environment, WAYLAND_DISPLAY='wayland-0')}]
         self.assertFalse(self.evaluate(processes=stale)['ok'])
+
+    def test_start_event_waits_for_hyprland_instance_registration(self):
+        ownership = mock.Mock(side_effect=[(False, 'no live Hyprland instance exists'), (True, '')])
+        function_globals = HEALTH['wait_for_owner'].__globals__
+        with mock.patch.dict(function_globals, {
+            'is_canonical_invocation': ownership,
+            'canonical_instance': mock.Mock(return_value=None),
+        }), mock.patch.object(function_globals['time'], 'sleep'):
+            self.assertEqual(HEALTH['wait_for_owner'](1), (True, ''))
+        self.assertEqual(ownership.call_count, 2)
 
 
 if __name__ == '__main__':

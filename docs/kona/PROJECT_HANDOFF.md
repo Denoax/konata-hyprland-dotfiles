@@ -1,6 +1,6 @@
 # Current engineering handoff
 
-The accepted 2026-09-16 Kona implementation is checkpointed in Git and represented by the live captures under `showcase/`. Public orientation now lives in the root README and `docs/`; this directory retains subsystem reports and adverse evidence as engineering history.
+Kona Desktop V3 is the current public-main candidate and is represented by the privacy-reviewed captures under `showcase/assets/v3/`. Public orientation lives in the root README and `docs/`; this directory retains subsystem reports and adverse evidence as engineering history.
 
 ## Current architecture
 
@@ -16,7 +16,7 @@ The current visuals are accepted for the release checkpoint. Do not reopen aesth
 
 ## Outstanding proof
 
-Task07 remains partial only for one manual real PlasmaLogin logout/login lifecycle check. In-session recovery, forced-crash restart, environment, single-owner and non-destructive authorization checks pass. After the next normal login, run `kona-runtime-health polkit`, `systemctl --user --failed` and `hyprctl instances -j`.
+A real post-crash login exposed an early `hyprland.start` owner-check race and left the packaged polkit agent inactive. The owner check now waits a bounded five seconds for compositor registration, the current session is recovered to one systemd-owned agent, and a regression test covers the startup ordering. One fresh PlasmaLogin logout/login after this fix remains before a stable tag. After that login, run `kona-runtime-health polkit`, `systemctl --user --failed` and `hyprctl instances -j`.
 
 UWSM remains optional/deferred. Do not migrate the canonical session merely to close this validation item.
 

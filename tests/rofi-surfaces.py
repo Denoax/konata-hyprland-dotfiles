@@ -169,6 +169,22 @@ class RofiActions(unittest.TestCase):
         self.assertNotEqual(self.invoke('kona-wallpaper-menu', ['0']).returncode, 0)
         self.assertEqual(self.calls('kona-wallpaper'), [])
 
+    def test_workshop_wallpaper_delegates_to_engine_owner(self):
+        for mode in ['simple','static','animated']: self.wallpaper_set(mode)
+        preview = self.home/'preview.gif'
+        preview.write_bytes(b'not-a-real-image')
+        helper = self.bin/'kona-wallpaper-engine'
+        helper.write_text(SHIM + "\nif args := sys.argv[1:]:\n"
+                          "    if args == ['list']:\n"
+                          f"        print('1777452675\\tyes\\tMatrix\\tweb\\t{preview}\\t')\n"
+                          "    elif args == ['status', '--id']:\n"
+                          "        pass\n")
+        helper.chmod(0o755)
+        result = self.invoke('kona-wallpaper-menu', ['3'], CONFIRM_STATUS='0')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(['apply', '1777452675', '--acknowledge-web-risk'],
+                      self.calls('kona-wallpaper-engine'))
+
     def test_session_cancel_never_runs_power_action(self):
         self.invoke('kona-session-menu', ['Restart'], CONFIRM_STATUS='1')
         self.assertEqual(self.calls('systemctl'), [])

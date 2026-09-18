@@ -5,6 +5,8 @@ Item {
     id: root
 
     property string glyph: ""
+    property url iconSource: ""
+    property real iconSize: primary ? 84 : 34
     property string accessibleLabel: glyph
     objectName: accessibleLabel
     property int motionDuration: 120
@@ -81,8 +83,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: width / 2
-        color: root.primary
+        color: root.primary && root.iconSource.toString().length === 0
                ? root.accent
+               : root.selected ? Appearance.accentSoft
                : (mouse.containsMouse && root.enabled ? Appearance.surfacePressed : "transparent")
         border.width: root.activeFocus ? 2 : root.primary ? 1 : 0
         border.color: root.activeFocus ? Appearance.focus : root.primary ? Appearance.outlineStrong : "transparent"
@@ -91,11 +94,24 @@ Item {
 
         Text {
             anchors.centerIn: parent
-            visible: !root.outputDeviceIcon
+            visible: !root.outputDeviceIcon && root.iconSource.toString().length === 0
             text: root.glyph
             color: root.iconColor
+            font.family: "JetBrainsMono Nerd Font"
             font.pixelSize: root.primary ? 30 : 25
             font.weight: Font.DemiBold
+            opacity: root.enabled ? 1.0 : 0.45
+        }
+        Image {
+            anchors.centerIn: parent
+            width: root.iconSize
+            height: root.iconSize
+            visible: !root.outputDeviceIcon && root.iconSource.toString().length > 0
+            source: root.iconSource
+            sourceSize: Qt.size(Math.round(root.iconSize), Math.round(root.iconSize))
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            cache: true
             opacity: root.enabled ? 1.0 : 0.45
         }
     }

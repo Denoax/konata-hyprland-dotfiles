@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""Run Steam Workshop wallpapers without creating a second wallpaper owner."""
+
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import math
+
+
+HOME = Path.home()
+STATE_ROOT = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state"))
+RUNTIME_ROOT = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+STATE = STATE_ROOT / "kona/wallpaper-engine.json"
+LOG = STATE_ROOT / "kona/wallpaper-engine.log"
+LOCK = RUNTIME_ROOT / "kona-wallpaper.lock"
+PROFILE = STATE_ROOT / "kona/profile.json"
+PROC = Path(os.environ.get("KONA_PROC_ROOT", "/proc"))
+SUPPORTED_TYPES = {"scene", "video", "web"}
+WORKSHOP_APP_ID = "431960"
+
+
+def atomic(path, value):
+    data = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix="." + path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def read_json(path, default=None):
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return default
+
+
+def steam_roots():
+    roots = [
+        HOME / ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+        HOME / ".local/share/Steam",
+        HOME / ".steam/steam",
+    ]
+    seen = set()
+    for root in list(roots):
+        library_file = root / "steamapps/libraryfolders.vdf"
+        try:
+            text = library_file.read_text(errors="replace")
+        except OSError:
+            continue
+        for value in re.findall(r'"path"\s+"([^"]+)"', text):
+            roots.append(Path(value.replace("\\\\", "\\")))
+    result = []
+    for root in roots:
+        try:
+            resolved = root.expanduser().resolve()
+        except OSError:
+            continue
+        if resolved not in seen and (resolved / "steamapps").is_dir():
+            seen.add(resolved)
+            result.append(resolved)
+    return result
+
+
+def safe_text(value, fallback):
+    value = " ".join(str(value or fallback).split())
+    return value[:160] or fallback
+
+
+def workshop_items():
+    projects = {}
+    for steam_root in steam_roots():
+        workshop = steam_root / "steamapps/workshop/content" / WORKSHOP_APP_ID
+        if not workshop.is_dir():
+            continue
+        for directory in sorted(workshop.iterdir()):
+            if not directory.is_dir() or not directory.name.isdecimal():
+                continue
+            project_file = directory / "project.json"
+            project = read_json(project_file, {})
+            if not isinstance(project, dict):
+                project = {}
+            preview = project.get("preview")
+            preview_path = directory / preview if isinstance(preview, str) and preview else None
+            if preview_path is None or not preview_path.is_file():
+                preview_path = None
+            projects[directory.name] = {
+                "id": directory.name,
+                "title": safe_text(project.get("title"), f"Workshop {directory.name}"),
+                "project": project,
+                "project_file": project_file.is_file(),
+                "path": str(directory.resolve()),
+                "preview": str(preview_path.resolve()) if preview_path else "",
+                "assets": str((steam_root / "steamapps/common/wallpaper_engine/assets").resolve()),
+            }
+
+    def primitive_properties(values):
+        result = {}
+        if not isinstance(values, dict):
+            return result
+        for key, value in values.items():
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", key):
+                continue
+            if isinstance(value, bool):
+                result[key] = "1" if value else "0"
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                if isinstance(value, float) and not math.isfinite(value):
+                    continue
+                result[key] = str(value)
+            elif isinstance(value, str) and len(value) <= 4096:
+                result[key] = value
+        return result
+
+    def direct(item):
+        project = item["project"]
+        kind = safe_text(project.get("type"), "unknown").lower()
+        entry = project.get("file")
+        directory = Path(item["path"])
+        entry_path = directory / entry if isinstance(entry, str) and entry else None
+        packaged = (kind == "scene" and isinstance(entry, str) and entry and
+                    any((directory / name).is_file() for name in {
+                        f"{Path(entry).stem}.pkg", "scene.pkg", "gifscene.pkg"}))
+        reason = ""
+        if not item["project_file"]:
+            reason = "project.json missing"
+        elif kind not in SUPPORTED_TYPES:
+            reason = f"unsupported project type: {kind}"
+        elif entry_path is None or not (entry_path.is_file() or packaged):
+            reason = "project entry file missing"
+        return {**{key: value for key, value in item.items() if key not in ("project", "project_file")},
+                "type": kind, "compatible": not reason, "reason": reason,
+                "dependency": "", "preset": False, "properties": {},
+                "source_id": item["id"]}
+
+    resolved = {}
+
+    def resolve(item_id, chain=()):
+        if item_id in resolved:
+            return resolved[item_id]
+        item = projects[item_id]
+        project = item["project"]
+        dependency = project.get("dependency")
+        preset = project.get("preset")
+        if not isinstance(dependency, str) or not dependency.isdecimal() or not isinstance(preset, dict):
+            result = direct(item)
+        elif dependency in chain or dependency == item_id:
+            result = {**direct(item), "compatible": False, "reason": "preset dependency cycle"}
+        elif dependency not in projects:
+            result = {**direct(item), "compatible": False,
+                      "reason": f"preset dependency {dependency} is not downloaded",
+                      "dependency": dependency, "preset": True}
+        else:
+            target = resolve(dependency, (*chain, item_id))
+            reason = "" if target["compatible"] else f'dependency {dependency}: {target["reason"]}'
+            properties = {**target.get("properties", {}), **primitive_properties(preset)}
+            source = Path(target["path"])
+            preset_root = Path(item["path"])
+            source_id = target.get("source_id", dependency)
+            source_properties = projects[source_id]["project"].get("general", {}).get("properties", {})
+            if not isinstance(source_properties, dict):
+                source_properties = {}
+            for key, value in list(properties.items()):
+                definition = source_properties.get(key, {})
+                if not isinstance(definition, dict) or definition.get("type") not in ("file", "directory"):
+                    continue
+                if not value or "://" in value:
+                    continue
+                candidate = Path(value).expanduser()
+                choices = [candidate] if candidate.is_absolute() else [preset_root / candidate, source / candidate]
+                match = next((path.resolve() for path in choices if path.exists()), None)
+                if match is None:
+                    reason = f"preset asset missing: {value}"
+                    break
+                properties[key] = str(match)
+            result = {
+                **{key: value for key, value in item.items() if key not in ("project", "project_file")},
+                "type": target["type"],
+                "path": target["path"],
+                "assets": target["assets"],
+                "compatible": not reason,
+                "reason": reason,
+                "dependency": dependency,
+                "preset": True,
+                "properties": properties,
+                "source_id": source_id,
+            }
+        resolved[item_id] = result
+        return result
+
+    return [resolve(key) for key in sorted(projects, key=int)]
+
+
+def item_by_id(item_id, allow_experimental_web=False):
+    if not item_id.isdecimal():
+        raise ValueError("Workshop item ID must contain digits only")
+    for item in workshop_items():
+        if item["id"] == item_id:
+            if not item["compatible"]:
+                raise ValueError(f'{item["title"]}: {item["reason"]}')
+            if item["type"] == "web" and not allow_experimental_web:
+                raise ValueError(
+                    "Web wallpapers are experimental on this Hyprland/NVIDIA stack; "
+                    "confirm the crash risk in the wallpaper menu"
+                )
+            if not Path(item["assets"]).is_dir():
+                raise ValueError("Wallpaper Engine assets are not installed in this Steam library")
+            return item
+    raise ValueError(f"Workshop item {item_id} is not downloaded")
+
+
+def process_identity(pid):
+    try:
+        path = PROC / str(pid)
+        if path.stat().st_uid != os.getuid():
+            return None
+        executable = (path / "exe").resolve(strict=True)
+        if executable.name != "linux-wallpaperengine":
+            return None
+        fields = (path / "stat").read_text().rsplit(")", 1)[1].split()
+        return {"pid": pid, "start_ticks": int(fields[19])}
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def engine_processes():
+    result = []
+    for path in PROC.glob("[0-9]*"):
+        identity = process_identity(int(path.name))
+        if identity:
+            result.append(identity)
+    return result
+
+
+def selected_state():
+    value = read_json(STATE, {})
+    if (not isinstance(value, dict) or value.get("schema") != 1 or
+            not isinstance(value.get("id"), str) or not value["id"].isdecimal()):
+        return None
+    return value
+
+
+def stop_worker(preserve_selection=True):
+    previous = selected_state()
+    processes = engine_processes()
+    for process in processes:
+        try:
+            os.kill(process["pid"], signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + 5
+    while engine_processes() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    for process in engine_processes():
+        try:
+            os.kill(process["pid"], signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if preserve_selection and previous:
+        previous["processes"] = []
+        atomic(STATE, previous)
+    else:
+        STATE.unlink(missing_ok=True)
+
+
+def monitors():
+    result = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True, timeout=5)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or "Hyprland monitor query failed")
+    values = json.loads(result.stdout)
+    names = [item["name"] for item in sorted(values, key=lambda value: value["x"])]
+    if not names:
+        raise RuntimeError("No active Hyprland outputs were found")
+    return names
+
+
+def launch(item):
+    executable = shutil.which("linux-wallpaperengine")
+    if not executable:
+        raise RuntimeError("linux-wallpaperengine is not installed")
+    command = [
+        executable,
+        "--silent",
+        "--fps", "30",
+        "--fullscreen-pause-only-active",
+        "--layer", "background",
+        "--assets-dir", item["assets"],
+    ]
+    for key, value in sorted(item.get("properties", {}).items()):
+        command.extend(["--set-property", f"{key}={value}"])
+    for output in monitors():
+        command.extend(["--screen-root", output, "--bg", item["path"], "--scaling", "fill"])
+    environment = os.environ.copy()
+    cef = Path("/opt/linux-wallpaperengine/libcef.so")
+    if item["type"] == "web" and cef.is_file():
+        existing = environment.get("LD_PRELOAD")
+        environment["LD_PRELOAD"] = f"{cef}:{existing}" if existing else str(cef)
+    if (PROC / "driver/nvidia/version").exists():
+        environment["__GL_THREADED_OPTIMIZATIONS"] = "0"
+    launcher = ["uwsm", "app", "-s", "b", "--", *command] if shutil.which("uwsm") else command
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("ab", buffering=0) as stream:
+        stream.write(f'\n--- {time.strftime("%Y-%m-%d %H:%M:%S")} item {item["id"]} ---\n'.encode())
+        subprocess.Popen(launcher, env=environment, stdin=subprocess.DEVNULL, stdout=stream,
+                         stderr=subprocess.STDOUT, start_new_session=True)
+    deadline = time.monotonic() + 10
+    found = []
+    while time.monotonic() < deadline:
+        found = engine_processes()
+        if found:
+            time.sleep(1)
+            found = engine_processes()
+            if found:
+                return found
+        time.sleep(0.1)
+    raise RuntimeError(f"Wallpaper Engine renderer did not start; inspect {LOG}")
+
+
+def current_profile():
+    value = read_json(PROFILE, {})
+    return value.get("profile", "daily") if isinstance(value, dict) else "daily"
+
+
+def apply(item_id, allow_experimental_web=False):
+    profile = current_profile()
+    if profile in ("focus", "gaming"):
+        raise RuntimeError(f"{profile.capitalize()} profile requires a static wallpaper; switch to Daily or Showcase")
+    item = item_by_id(item_id, allow_experimental_web)
+    previous = read_json(STATE, {})
+    stop_worker()
+    try:
+        processes = launch(item)
+    except Exception:
+        previous_id = previous.get("id") if isinstance(previous, dict) else None
+        if isinstance(previous_id, str):
+            try:
+                old = item_by_id(previous_id, allow_experimental_web=True)
+                old_processes = launch(old)
+                previous["processes"] = old_processes
+                atomic(STATE, previous)
+            except Exception as rollback:
+                print(f"kona-wallpaper-engine: rollback failed: {rollback}", file=sys.stderr)
+        raise
+    if shutil.which("awww"):
+        subprocess.run(["awww", "kill"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "hyprpaper"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    atomic(STATE, {
+        "schema": 1,
+        "id": item["id"],
+        "title": item["title"],
+        "type": item["type"],
+        "path": item["path"],
+        "dependency": item.get("dependency", ""),
+        "preset": bool(item.get("preset")),
+        "nvidia_workaround": (PROC / "driver/nvidia/version").exists(),
+        "processes": processes,
+    })
+    subprocess.run(["notify-send", "-a", "Kona Wallpaper", item["title"],
+                    f'Steam Workshop {item["type"]} wallpaper enabled'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def restore_default():
+    saved = selected_state()
+    if not saved:
+        raise RuntimeError("no Wallpaper Engine default has been selected")
+    if current_profile() in ("focus", "gaming"):
+        raise RuntimeError(f"{current_profile().capitalize()} profile requires a static wallpaper")
+    # A Web project previously crashed the compositor's framebuffer path. A
+    # helper cannot run its fallback after the compositor itself dies, so Web
+    # stays an explicitly acknowledged manual action rather than an auto-start.
+    if saved.get("type") == "web":
+        raise RuntimeError("Web wallpaper defaults require manual confirmation after login")
+    active = active_state()
+    if active and active.get("id") == saved["id"]:
+        return
+    # Startup gets one bounded attempt; the profile worker owns the fallback.
+    apply(saved["id"])
+
+
+def active_state():
+    value = read_json(STATE, {})
+    if not isinstance(value, dict) or value.get("schema") != 1:
+        return None
+    identities = {(item["pid"], item["start_ticks"]) for item in engine_processes()}
+    recorded = {(item.get("pid"), item.get("start_ticks")) for item in value.get("processes", [])
+                if isinstance(item, dict)}
+    return value if identities & recorded else None
+
+
+def browse():
+    url = "steam://openurl/https://steamcommunity.com/workshop/browse/?appid=431960"
+    if shutil.which("flatpak"):
+        command = ["flatpak", "run", "com.valvesoftware.Steam", url]
+    elif shutil.which("steam"):
+        command = ["steam", url]
+    else:
+        raise RuntimeError("Steam is not installed")
+    launcher = ["uwsm", "app", "-s", "b", "--", *command] if shutil.which("uwsm") else command
+    subprocess.Popen(launcher, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def print_items(as_json):
+    items = workshop_items()
+    if as_json:
+        print(json.dumps(items, indent=2))
+        return
+    for item in items:
+        fields = (item["id"], "yes" if item["compatible"] else "no", item["title"],
+                  item["type"], item["preview"], item["reason"])
+        print("\t".join(value.replace("\t", " ").replace("\n", " ") for value in fields))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="action", required=True)
+    listing = sub.add_parser("list")
+    listing.add_argument("--json", action="store_true")
+    sub.add_parser("status").add_argument("--id", action="store_true")
+    sub.add_parser("browse")
+    sub.add_parser("stop")
+    sub.add_parser("stop-worker")
+    sub.add_parser("restore-default")
+    sub.add_parser("restore-default-worker")
+    applying = sub.add_parser("apply")
+    applying.add_argument("item_id")
+    applying.add_argument("--acknowledge-web-risk", action="store_true")
+    args = parser.parse_args()
+    if args.action == "list":
+        print_items(args.json)
+        return
+    if args.action == "status":
+        value = active_state()
+        if args.id:
+            print(value.get("id", "") if value else "")
+        else:
+            print(json.dumps({"active": bool(value), **(value or {})}, indent=2))
+        return
+    if args.action == "browse":
+        browse()
+        return
+    if args.action == "stop-worker":
+        stop_worker()
+        return
+    if args.action == "stop":
+        profile = HOME / ".local/bin/kona-profile"
+        if profile.is_file():
+            subprocess.run([str(profile), "wallpaper", "restore"], check=True)
+        else:
+            stop_worker()
+        return
+    if args.action == "restore-default-worker":
+        restore_default()
+        return
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with LOCK.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if args.action == "restore-default":
+            restore_default()
+        else:
+            apply(args.item_id, args.acknowledge_web_risk)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError,
+            subprocess.SubprocessError, json.JSONDecodeError) as error:
+        print(f"kona-wallpaper-engine: {error}", file=sys.stderr)
+        sys.exit(1)

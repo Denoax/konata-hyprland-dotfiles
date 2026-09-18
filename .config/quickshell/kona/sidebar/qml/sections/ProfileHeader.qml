@@ -37,7 +37,7 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true; Layout.alignment: Qt.AlignTop; spacing: 6
                 Text { objectName: "headerSystemTitle"; text: "KONA"; color: Tokens.shellText; font.family: Tokens.uiFont; font.pixelSize: 23; font.weight: Font.DemiBold; font.letterSpacing: 4; Layout.fillWidth: true }
-                Text { objectName: "headerSystemSubtitle"; text: "Arch Linux / Hyprland"; color: Tokens.shellMuted; font.pixelSize: 11; font.family: Tokens.uiFont; elide: Text.ElideRight; Layout.fillWidth: true }
+                Text { objectName: "headerSystemSubtitle"; text: "Arch Linux · Hyprland"; color: Tokens.shellMuted; font.pixelSize: 11; font.family: Tokens.uiFont; elide: Text.ElideRight; Layout.fillWidth: true }
                 RowLayout { visible: root.statusLabel.length > 0; spacing: 7; Layout.fillWidth: true
                     Rectangle { Layout.preferredWidth: 7; Layout.preferredHeight: 7; radius: 3.5; color: Tokens.shellAccent }
                     Text { objectName: "headerProfile"; text: root.statusLabel; textFormat: Text.PlainText; color: Tokens.shellAccent; font.pixelSize: 11; font.family: Tokens.uiFont; font.weight: Font.Medium; elide: Text.ElideRight; Layout.fillWidth: true }

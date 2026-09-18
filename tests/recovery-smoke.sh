@@ -26,6 +26,7 @@ XDG_STATE_HOME="$test_home/.local/state" \
 required=(
   '.config/hypr/hyprland.lua'
   '.local/bin/kona-wallpaper-menu'
+  '.local/bin/kona-wallpaper-engine'
   '.local/bin/kona-profile'
   '.local/bin/kona-shell'
   '.local/bin/kona-preferences'
@@ -42,6 +43,19 @@ required=(
   '.local/share/applications/kona-studio.desktop'
   '.local/bin/kona-profile-menu'
   '.local/bin/kona-runtime-start'
+  '.local/bin/kona-arch-workspace'
+  '.local/bin/kona-arch-system-shell'
+  '.local/bin/kona-scratch-shell'
+  '.local/bin/kona-terminal'
+  '.local/bin/kona-weather'
+  '.local/bin/kona-weather-popup'
+  '.config/btop/kona-arch.conf'
+  '.config/cava/kona-arch.conf'
+  '.config/fastfetch/kona-arch.jsonc'
+  '.config/fastfetch/assets/kona-thumbs-up.png'
+  '.config/quickshell/kona/weather/shell.qml'
+  '.config/quickshell/kona/weather/WeatherPopupView.qml'
+  '.config/kona/weather.example.json'
   '.config/rofi/shared.rasi'
   '.config/rofi/konata.rasi'
   '.config/rofi/window.rasi'
@@ -76,7 +90,7 @@ for relative in "${required[@]}"; do
   [[ -s "$test_home/$relative" ]] || { printf 'missing restored file: %s\n' "$relative" >&2; exit 1; }
 done
 [[ -x "$test_home/.local/bin/kona-backup" ]]
-for command in kona-workspace-capture kona-waybar-refresh kona-state kona-theme kona-appearance kona-wallpaper-menu kona-profile kona-profile-menu kona-runtime-start; do
+for command in kona-workspace-capture kona-waybar-refresh kona-state kona-theme kona-appearance kona-wallpaper-menu kona-wallpaper-engine kona-profile kona-profile-menu kona-runtime-start kona-arch-workspace kona-arch-system-shell kona-scratch-shell kona-terminal kona-weather kona-weather-popup; do
   [[ -x "$test_home/.local/bin/$command" ]]
   cmp -s "$repo_root/.local/bin/$command" "$test_home/.local/bin/$command"
 done

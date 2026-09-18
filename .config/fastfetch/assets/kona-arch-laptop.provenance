@@ -1,0 +1,5 @@
+Source: user-supplied local file b4b55457-bc8e-46d7-b1f4-3bff340a2ac7.png
+Purpose: Super+Shift+D Arch workspace Fastfetch identity
+Original: kona-arch-laptop.png (1254x1254, unchanged)
+Runtime derivative: kona-arch-laptop-terminal.png (432x578)
+Treatment: transparent side margins cropped; Lanczos downsampled at 2x the terminal target and lightly sharpened so Kitty does not reduce the full square at runtime

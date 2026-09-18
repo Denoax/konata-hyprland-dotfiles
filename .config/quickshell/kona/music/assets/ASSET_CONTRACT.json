@@ -1,0 +1,24 @@
+{
+  "icon_size_primary": 32,
+  "icon_size_transport": 34,
+  "play_pause_size": 84,
+  "satellite_bubbles": {
+    "small": 14,
+    "medium": 24,
+    "large": 34
+  },
+  "ribbon": {
+    "height": 200,
+    "radius": 100
+  },
+  "album": {
+    "outer": 310,
+    "art": 228
+  },
+  "rules": [
+    "Use supplied SVGs directly; do not substitute font glyphs.",
+    "Keep current Light/Dark semantic surfaces while preserving icon geometry.",
+    "The liquid guide is a silhouette guide, not a static replacement for the animated QML contour.",
+    "Do not wire favorite unless an authoritative favorite backend exists."
+  ]
+}

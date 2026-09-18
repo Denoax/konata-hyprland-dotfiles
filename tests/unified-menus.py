@@ -31,18 +31,25 @@ class UnifiedMenus(unittest.TestCase):
     def test_command_center_preserves_swaync_as_owner(self):
         dashboard = self.text('.local/bin/kona-dashboard')
         self.assertIn('swaync-client --open-panel --skip-wait', dashboard)
+        self.assertIn('swaync-client --toggle-panel --skip-wait', dashboard)
         self.assertNotIn('kona-shell', dashboard)
         bindings = self.text('.config/hypr/hyprland.lua')
         self.assertIn('kona-dashboard', bindings)
+        self.assertNotIn('swaync-client -t -sw', bindings)
+        self.assertIn('kona-dashboard --toggle', self.text('.config/waybar/config.jsonc'))
+        self.assertIn('[bin + "kona-dashboard", "--toggle"]',
+                      self.text('.config/quickshell/kona/sidebar/shell.qml'))
 
     def test_swaync_actions_keep_existing_backend_owners(self):
         config = json.loads(self.text('.config/swaync/config.json'))
         rendered = json.dumps(config)
-        for owner in ('nmcli', 'kona-night-light', 'kona-game-mode', 'kona-record',
-                      'kona-overview', 'kona-audio-menu', 'kona-session-menu'):
+        for owner in ('swaync-client -dn', 'kona-profile', 'kona-record',
+                      'kona-screenshot', 'systemsettings', 'hyprlock',
+                      'kona-session-menu'):
             self.assertIn(owner, rendered)
         self.assertEqual(config['transition-time'], 200)
         self.assertEqual(config['text-empty'], 'No notifications')
+        self.assertEqual(config['widgets'].count('notifications'), 1)
 
     def test_destructive_session_actions_are_cancel_first(self):
         session = self.text('.local/bin/kona-session-menu')

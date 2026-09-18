@@ -83,6 +83,17 @@ start_hyprpaper() {
   printf 'Hyprpaper did not become ready.\n' >&2; return 1
 }
 
+stop_wallpaper_engine() {
+  local helper="$HOME/.local/bin/kona-wallpaper-engine"
+  [[ ! -x "$helper" ]] || "$helper" stop-worker
+}
+
+restore_wallpaper_engine() {
+  local helper="$HOME/.local/bin/kona-wallpaper-engine"
+  [[ -x "$helper" ]] || return 1
+  "$helper" restore-default-worker
+}
+
 # Prepare and populate the replacement before stopping the old backend. Failed
 # switches retain the old owner until the coordinator attempts rollback.
 if [[ "$static" == true ]]; then
@@ -93,11 +104,19 @@ if [[ "$static" == true ]]; then
   done
   if pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then awww kill; fi
   for _ in {1..50}; do
-    if ! pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then exit 0; fi
+    if ! pgrep -u "$(id -u)" -x awww-daemon >/dev/null; then
+      stop_wallpaper_engine
+      exit 0
+    fi
     sleep .1
   done
   printf 'Awww remained active after static-policy switch.\n' >&2; exit 1
 else
+  # Daily and Showcase first restore the user's persisted Workshop selection.
+  # A failed bounded attempt falls through to the accepted Awww scene below.
+  if [[ "$mode" == animated ]] && restore_wallpaper_engine; then
+    exit 0
+  fi
   start_awww
   if [[ "$mode" == simple ]]; then
     awww img "${images[0]}" --resize crop --transition-type fade --transition-duration 0.6 --transition-fps 60
@@ -112,9 +131,13 @@ else
   if pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then
     pkill -u "$(id -u)" -x hyprpaper
     for _ in {1..50}; do
-      if ! pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then exit 0; fi
+      if ! pgrep -u "$(id -u)" -x hyprpaper >/dev/null; then
+        stop_wallpaper_engine
+        exit 0
+      fi
       sleep .1
     done
     printf 'Hyprpaper remained active after Awww-policy switch.\n' >&2; exit 1
   fi
+  stop_wallpaper_engine
 fi

@@ -1,0 +1,80 @@
+{
+  "favorite": {
+    "file": "music/icons/favorite.png",
+    "source_bbox": [
+      80,
+      484,
+      248,
+      638
+    ],
+    "size": [
+      168,
+      154
+    ]
+  },
+  "shuffle": {
+    "file": "music/icons/shuffle.png",
+    "source_bbox": [
+      277,
+      484,
+      454,
+      648
+    ],
+    "size": [
+      177,
+      164
+    ]
+  },
+  "previous": {
+    "file": "music/icons/previous.png",
+    "source_bbox": [
+      474,
+      482,
+      636,
+      639
+    ],
+    "size": [
+      162,
+      157
+    ]
+  },
+  "play_pause": {
+    "file": "music/icons/play_pause.png",
+    "source_bbox": [
+      633,
+      385,
+      969,
+      726
+    ],
+    "size": [
+      336,
+      341
+    ]
+  },
+  "next": {
+    "file": "music/icons/next.png",
+    "source_bbox": [
+      968,
+      482,
+      1132,
+      638
+    ],
+    "size": [
+      164,
+      156
+    ]
+  },
+  "repeat": {
+    "file": "music/icons/repeat.png",
+    "source_bbox": [
+      1176,
+      473,
+      1365,
+      652
+    ],
+    "size": [
+      189,
+      179
+    ]
+  }
+}

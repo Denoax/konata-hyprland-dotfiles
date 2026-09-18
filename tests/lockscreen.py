@@ -16,6 +16,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / ".config/hypr/hyprlock.conf"
 ASSETS = ROOT / ".config/kona/lockscreen/mono-rain"
+BACKDROP = ROOT / ".config/kona/lockscreen/current-wallpaper/konata-workshop-3569997458.png"
 FRAMES = ASSETS / "frames"
 HELPER = ASSETS / "kona-lock-rain-frame"
 
@@ -23,7 +24,7 @@ HELPER = ASSETS / "kona-lock-rain-frame"
 class LockscreenTests(unittest.TestCase):
     def test_approved_production_assets_are_unchanged(self) -> None:
         expected = {
-            "avatar/konata-avatar-512.png": "97b3f6ed0d1a77a71c18af7fea273b910dc576c683eb82f13617d343fd17fab4",
+            "avatar/konata-avatar-512.png": "63516a5717b26c1ea7f229c9b797f48940eae95f4772752c3ca039c8279c64b2",
             "background/konata-lock-base.png": "507480487cf7181ad57fcb71791b33dd732cb5599edfa356554e80ee14df86e5",
             "background/konata-lock-static-fallback.png": "68058a1cd2105705deee7747890276c7033811a4ad3d401aa99466cc1f724f6c",
         }
@@ -94,8 +95,9 @@ class LockscreenTests(unittest.TestCase):
         self.assertEqual(1, config.count("kona-lock-rain-frame"))
         self.assertIn("monitor = DP-4", config)
         self.assertEqual(3, len(re.findall(r"^background\s*\{", config, re.M)))
-        self.assertIn("konata-lock-base.png", config)
-        self.assertIn("konata-lock-static-fallback.png", config)
+        self.assertEqual(4, config.count("$backdrop"))
+        self.assertTrue(BACKDROP.is_file())
+        self.assertGreater(BACKDROP.stat().st_size, 1_000_000)
 
 
 if __name__ == "__main__":

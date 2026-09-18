@@ -29,7 +29,8 @@ The authoritative definitions are in `.config/hypr/hyprland.lua`. This is the hu
 
 | Shortcut | Action |
 | --- | --- |
-| `Super + Return` | Kitty |
+| `Super + Return` / `Alt + Return` | Kona terminal |
+| `Super + Grave` | Toggle the single scratch terminal |
 | `Super + E` | Default file manager |
 | `Super + B` | Browser |
 | `Super + R` | Command launcher |
@@ -40,6 +41,7 @@ The authoritative definitions are in `.config/hypr/hyprland.lua`. This is the hu
 | `Super + H` or `Ctrl + H` | Minimize active window |
 | `Super + Shift + H` | Restore most recent minimized window |
 | `Super + D` or `Super + M` | Show desktop |
+| `Super + Shift + D` | Toggle the Arch workspace (Btop, Fastfetch and CAVA) |
 | `Super + arrow` | Focus window |
 | `Super + Shift + arrow` | Move window |
 | `Alt + left drag` | Move window |

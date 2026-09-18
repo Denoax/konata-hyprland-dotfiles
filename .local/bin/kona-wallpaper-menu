@@ -8,9 +8,13 @@ trap 'rm -f -- "$menu"' EXIT
 modes=()
 mkdir -p "$thumb_root"
 current_mode="$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/kona-wallpaper-mode" 2>/dev/null || printf animated)"
+engine="$HOME/.local/bin/kona-wallpaper-engine"
+current_engine=""
+[[ ! -x "$engine" ]] || current_engine="$("$engine" status --id 2>/dev/null || true)"
 
 thumbnail_for() {
-  local mode="$1" source="$2" destination="$thumb_root/$mode.png" temporary
+  local mode="$1" source="$2" temporary
+  local destination="$thumb_root/$mode.png"
   if [[ ! -s "$destination" || "$source" -nt "$destination" ]]; then
     temporary="$(mktemp "$thumb_root/.$mode.XXXXXX.png")"
     if ffmpeg -hide_banner -loglevel error -y -i "$source" -frames:v 1 \
@@ -33,8 +37,33 @@ add_set() {
   # deterministic and rebuilt only when its authoritative source is newer.
   preview="$(thumbnail_for "$mode" "$preview")"
   local marker='  '
-  [[ "$mode" != "$current_mode" ]] || marker='● '
+  [[ -n "$current_engine" || "$mode" != "$current_mode" ]] || marker='● '
   printf '%s%s · %s\0icon\x1f%s\n' "$marker" "$label" "$description" "$preview" >> "$menu"
+}
+
+add_workshop() {
+  local id="$1" compatible="$2" label="$3" kind="$4" preview="$5" reason="$6" marker='  '
+  [[ -n "$preview" && -r "$preview" ]] && preview="$(thumbnail_for "steam-$id" "$preview")"
+  [[ "$id" != "$current_engine" ]] || marker='● '
+  if [[ "$compatible" == yes ]]; then
+    if [[ "$kind" == web ]]; then
+      modes+=("engine-web:$id")
+    else
+      modes+=("engine:$id")
+    fi
+    if [[ -n "$preview" ]]; then
+      printf '%s%s · Steam Workshop %s\0icon\x1f%s\n' "$marker" "$label" "$kind" "$preview" >> "$menu"
+    else
+      printf '%s%s · Steam Workshop %s\n' "$marker" "$label" "$kind" >> "$menu"
+    fi
+  else
+    modes+=("unavailable:$id:$reason")
+    if [[ -n "$preview" ]]; then
+      printf '  %s · unavailable (%s)\0icon\x1f%s\n' "$label" "$reason" "$preview" >> "$menu"
+    else
+      printf '  %s · unavailable (%s)\n' "$label" "$reason" >> "$menu"
+    fi
+  fi
 }
 
 add_set simple 'Simple' 'Curated still' "$wall_root/v2/selected.png" "$wall_root/v2/selected.png"
@@ -43,13 +72,44 @@ add_set static 'Static' 'Three-panel panorama' "$wall_root/center.png" \
 add_set animated 'Animated' 'Three-panel motion' "$wall_root/animated/center.webp" \
   "$wall_root/animated/left.webp" "$wall_root/animated/center.webp" "$wall_root/animated/right.webp"
 
+if [[ -x "$engine" ]]; then
+  while IFS=$'\t' read -r id compatible label kind preview reason; do
+    [[ -n "$id" ]] || continue
+    add_workshop "$id" "$compatible" "$label" "$kind" "$preview" "$reason"
+  done < <("$engine" list 2>/dev/null || true)
+  [[ -z "$current_engine" ]] || {
+    modes+=(restore)
+    printf '  Restore Kona wallpaper · stop Wallpaper Engine\n' >> "$menu"
+  }
+  modes+=(browse)
+  printf '  Browse Steam Workshop · subscribe and download\n' >> "$menu"
+fi
+
 if (( ${#modes[@]} == 0 )); then
   notify-send -u critical 'Wallpapers unavailable' 'No complete installed Kona wallpaper set was found.'
   exit 1
 fi
 choice="$(rofi -dmenu -i -no-custom -no-sort -show-icons -format i \
   -p 'Wallpapers' -theme "$HOME/.config/rofi/wallpaper.rasi" < "$menu")" || exit 0
-case "$choice" in 0|1|2) ;; *) exit 0 ;; esac
+[[ "$choice" =~ ^[0-9]+$ ]] || exit 0
 [[ -v "modes[$choice]" ]] || exit 0
-"$HOME/.local/bin/kona-wallpaper" "${modes[$choice]}"
+selected="${modes[$choice]}"
+case "$selected" in
+  simple|static|animated) "$HOME/.local/bin/kona-wallpaper" "$selected" ;;
+  engine:*) "$engine" apply "${selected#engine:}" ;;
+  engine-web:*)
+    "$HOME/.local/bin/kona-confirm" \
+      'Web wallpapers may crash this Hyprland/NVIDIA session. Continue?' \
+      'Run experimental Web wallpaper' || exit 0
+    "$engine" apply "${selected#engine-web:}" --acknowledge-web-risk
+    ;;
+  unavailable:*)
+    reason="${selected#unavailable:*:}"
+    notify-send -u normal 'Wallpaper unavailable' "$reason"
+    exit 0
+    ;;
+  restore) "$engine" stop ;;
+  browse) "$engine" browse ;;
+  *) exit 0 ;;
+esac
 "$HOME/.local/bin/kona-menu-sound"

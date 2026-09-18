@@ -212,13 +212,33 @@ def is_canonical_invocation() -> tuple[bool, str]:
     return True, ""
 
 
+def wait_for_owner(timeout: float) -> tuple[bool, str]:
+    """Wait only for the compositor registry used by the start event to settle."""
+    deadline = time.monotonic() + timeout
+    problem = "no live Hyprland instance exists"
+    while True:
+        owns_session, problem = is_canonical_invocation()
+        if owns_session:
+            return True, ""
+        # A different live compositor is a definitive ownership answer. Only an
+        # empty registry is expected briefly during hyprland.start.
+        if canonical_instance() is not None or time.monotonic() >= deadline:
+            return False, problem
+        time.sleep(0.05)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("owner", "ready", "wait-ready", "polkit"), nargs="?", default="polkit")
+    parser.add_argument("command", choices=("owner", "wait-owner", "ready", "wait-ready", "polkit"), nargs="?", default="polkit")
     parser.add_argument("--timeout", type=float, default=5)
     arguments = parser.parse_args()
     if arguments.command == "owner":
         owns_session, problem = is_canonical_invocation()
+        if not owns_session:
+            print("kona-runtime-health: " + problem, file=sys.stderr)
+        return 0 if owns_session else 1
+    if arguments.command == "wait-owner":
+        owns_session, problem = wait_for_owner(max(0, min(arguments.timeout, 15)))
         if not owns_session:
             print("kona-runtime-health: " + problem, file=sys.stderr)
         return 0 if owns_session else 1

@@ -1,6 +1,6 @@
 # Installation
 
-Kona targets Arch Linux and Hyprland's native Lua configuration. It is Mani's real three-monitor profile, so inspect the hardware assumptions before logging into it.
+Kona targets Arch Linux and Hyprland's native Lua configuration. It comes from a real three-monitor workstation, so inspect the hardware assumptions before logging into it.
 
 ## 1. Inspect the scope
 
@@ -16,7 +16,7 @@ It does not install packages from `packages/pacman.txt`, choose GPU drivers, edi
 
 ## 2. Adapt the machine boundary
 
-Run `hyprctl monitors` from a working session. Edit monitor modes, positions and workspace rules in `.config/hypr/hyprland.lua`. Review `packages/pacman.txt` and install only the dependencies appropriate to your system. `packages/hardware-mani.txt` is documentation for the original workstation and must not be installed blindly.
+Run `hyprctl monitors` from a working session. Edit monitor modes, positions and workspace rules in `.config/hypr/hyprland.lua`. Review `packages/pacman.txt` and install only the dependencies appropriate to your system. `packages/hardware-mani.txt` documents the reference workstation and must not be installed blindly.
 
 ## 3. Install
 

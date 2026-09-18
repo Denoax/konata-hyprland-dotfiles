@@ -16,8 +16,9 @@ against a non-listening Wayland socket before the next login was ready, reached
 
 `kona-runtime-start` now runs from Hyprland's native `hyprland.start` event and:
 
-1. proves that the invoking compositor is the oldest live Hyprland instance for the
-   login session, preventing nested/manual compositors from duplicating session owners;
+1. waits up to five seconds for the starting compositor to enter Hyprland's instance
+   registry, then proves that it is the oldest live instance for the login session,
+   preventing nested/manual compositors from duplicating session owners;
 2. imports that compositor's display and instance identity into the user manager;
 3. waits on actual Wayland and Hyprland IPC readiness, with a five-second bound;
 4. clears any previous start limit and restarts the packaged agent exactly once;
@@ -70,8 +71,12 @@ was recovered once after two seconds with one replacement PID and `NRestarts=1`.
 non-destructive `pkexec /usr/bin/true` authorization completed successfully. Current
 owner inspection found no failed user units or duplicate Kona owners.
 
-One manual PlasmaLogin logout/login remains required to prove the complete real-session
-boundary. Do not automate that logout. After the next normal login, run:
+A post-crash login on 2026-09-17 exposed the missing registry-settle wait: the start
+event could run before `hyprctl instances` reported the new compositor, causing the
+owner check to exit and leave the agent inactive. The bounded wait and its regression
+test now cover that ordering. One fresh PlasmaLogin logout/login after this fix remains
+required to prove the complete real-session boundary. Do not automate that logout.
+After the next normal login, run:
 
 ```sh
 kona-runtime-health polkit

@@ -1,50 +1,47 @@
-# Kona Control Center
+# Kona Notification Center
 
-SwayNC remains the notification and control-center process. The Task04 composition
-uses native title, DND, buttons-grid, MPRIS, volume, menubar and notifications widgets.
-There is no additional controller, poller or theme daemon.
+SwayNC remains the sole notification daemon, history store, DND owner, and
+control-center process. The authored presentation uses native SwayNC widgets for
+the hero, quick controls, notification list, quick actions, and footer. It does
+not introduce a resident controller or another notification data model.
 
-Open with the existing Super+A / Super+N bindings or Task03 Waybar controls. Super+C
-and the Waybar right-click quick-settings actions keep the existing Rofi fallback.
-Task03 monitor roles and Waybar source are unchanged.
+The four quick controls route to the existing owners:
 
-Frequent controls occupy two rows: Wi-Fi, Bluetooth manager, night light, gaming,
-recording and overview. Native DND sits above them. Media hides when absent; volume,
-audio devices and the existing per-app mixer remain accessible. System holds updates,
-backup, network, Bluetooth, appearance and settings. Lock and session are separate.
-Backup explicitly confirms that the existing command may commit and push; session
-retains its existing confirmation flow. Neither operation runs just by opening a menu.
+- Do Not Disturb: SwayNC
+- Focus Mode: `kona-profile`
+- Screen Record: `kona-record` and `kona-record-status`
+- Screenshot: `kona-screenshot`
 
-Wi-Fi, gaming, recording and night light use native toggle/update-command support.
-State refreshes when the panel opens, through existing Kona command/state owners.
-External changes while the panel is already open appear on reopening. Native SwayNC
-0.12.6 toggles are optimistic if an action fails; no background state monitor was added.
-Bluetooth is an action, since the current machine's Bluetooth backend is unavailable.
+Open Settings uses the existing system settings surface. Power Menu and Log Out
+open `kona-session-menu`, so its cancel-first confirmations remain authoritative.
+Lock Screen uses Hyprlock. Native notification app icons, titles, bodies,
+timestamps, grouping, images, inline replies, action buttons, urgency, and clear
+semantics remain enabled.
 
-Colors come exclusively from `../kona/theme/current/swaync.css`. Main surfaces retain
-Task02 navy/ice semantics; checked state, focus, slider and urgency carry the emphasis.
-Notification grouping, inline replies, code actions, images, critical persistence,
-history, clear-all and native action routing remain enabled.
+Colors still come exclusively from
+`../kona/theme/current/swaync.css`. The matching Light/Dark character and icon
+assets live under `assets/light` and `assets/dark`. `kona-dashboard` selects
+the artwork for the current authoritative appearance mode and writes the current
+clock, date, and real SwayNC count immediately before opening. That work is
+one-shot and exits before the panel is shown.
 
 ## Command compatibility
 
-Installed SwayNC0.12.6 `Functions.execute_command` wraps each configured command in
-**another double-quoted GLib command-line parse** before invoking `/bin/sh -c`.
-The embedded quotes and backslashes therefore require escaping for that layer as well
-as JSON. Do not validate these strings solely with `sh -c CONFIG_VALUE`.
+Installed SwayNC 0.12.6 parses configured commands through GLib before invoking
+the shell. Embedded double quotes therefore retain a literal backslash in the
+JSON value. `python3 tests/control-center.py` exercises this installed parsing
+contract and owner routing.
 
-`python3 tests/control-center.py` exercises the actual GLib parsing layer, including
-paths containing spaces, failed operations, matching toggle state and exact backup
-confirmation. Revalidate this boundary against the installed build when upgrading
-SwayNC; the version-specific parser behavior is not a general shell convention.
+## Apply and recover
 
-## Apply / recover
+Install `.config/swaync/` and `.local/bin/kona-dashboard`, then run:
 
-The product changes are `.config/swaync/config.json` and `style.css`. Save both current
-files before applying, then use `swaync-client --reload-config` and
-`swaync-client --reload-css`. These retain the running process and notification history.
-Restore the saved files and reload to roll back. The Task04 evidence directory contains
-separate live and repository backups, including the accepted Task02 style.
+```sh
+kona-dashboard --sync-only
+swaync-client --reload-config --skip-wait
+swaync-client --reload-css --skip-wait
+```
 
-Task04 validation and remaining acceptance limits are recorded in PROJECT_HANDOFF.md.
-Task05 has not started. No visual approval of Task04 is implied by these checks.
+These operations retain the running SwayNC process and notification history.
+Restore the previous config, stylesheet, assets, and dashboard entrypoint, then
+reload config and CSS to roll back.

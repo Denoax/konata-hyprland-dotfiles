@@ -42,6 +42,15 @@ kona-profile daily
 
 Daily is the conservative recovery profile. Profile changes preserve one wallpaper backend and roll back failed scene transitions. Generated wallpaper assets remain in `.config/kona/wallpapers/`; runtime selection state remains under `~/.local/state/kona/`.
 
+If a Steam Workshop wallpaper fails, restore the prior Kona scene with:
+
+```bash
+kona-wallpaper-engine stop
+```
+
+The command starts the profile's normal backend before stopping the Workshop renderer. Renderer diagnostics are recorded in `~/.local/state/kona/wallpaper-engine.log`.
+The selected Workshop item remains in `~/.local/state/kona/wallpaper-engine.json` after the renderer stops. Daily and Showcase attempt a Scene or Video item once during policy restoration; if startup fails, the policy continues to the accepted Awww scene without retrying. Web items require manual confirmation after login because the recorded compositor crash can prevent in-process recovery. Focus and Gaming always keep their static policy.
+
 ## Restore a previous live file
 
 Use the newest matching `pre-restore-*` directory and restore only the affected file or subtree. Keep ownership and executable bits. Then use a scoped reload:

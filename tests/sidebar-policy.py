@@ -15,7 +15,8 @@ ShellRoot {
  IpcHandler { target: "test"; function status(): string { return JSON.stringify({ready: policy.ready, reduced: policy.reducedMotion, quiet: policy.quiet, profile: policy.profileName}); } }
 }
 ''')
- env={**os.environ,'QA_ROOT':str(d),'LD_LIBRARY_PATH':str(P/'lib'),'QML_IMPORT_PATH':str(P/'lib/qt6/qml'),'QT_PLUGIN_PATH':str(P/'lib/qt6/plugins')}
+ system_library_path=os.environ.get('LD_LIBRARY_PATH','/usr/lib')
+ env={**os.environ,'QA_ROOT':str(d),'LD_LIBRARY_PATH':f"{P/'lib'}:{system_library_path}",'QML_IMPORT_PATH':str(P/'lib/qt6/qml'),'QT_PLUGIN_PATH':str(P/'lib/qt6/plugins')}
  def state():return json.loads(subprocess.check_output([str(P/'bin/quickshell'),'ipc','-p',str(d),'call','test','status'],env=env,text=True,stderr=subprocess.DEVNULL,timeout=2))
  def wait(key,value):
   end=time.monotonic()+3

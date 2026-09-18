@@ -1,0 +1,39 @@
+{
+  "0": {
+    "day": "clear-day",
+    "night": "clear-night"
+  },
+  "1": {
+    "day": "clear-day",
+    "night": "clear-night"
+  },
+  "2": {
+    "day": "partly-cloudy-day",
+    "night": "partly-cloudy-night"
+  },
+  "3": "overcast",
+  "45": "fog",
+  "48": "fog",
+  "51": "drizzle",
+  "53": "drizzle",
+  "55": "drizzle",
+  "56": "freezing-rain",
+  "57": "freezing-rain",
+  "61": "rain",
+  "63": "rain",
+  "65": "heavy-rain",
+  "66": "freezing-rain",
+  "67": "freezing-rain",
+  "71": "snow",
+  "73": "snow",
+  "75": "snow",
+  "77": "snow",
+  "80": "rain",
+  "81": "rain",
+  "82": "heavy-rain",
+  "85": "snow-showers",
+  "86": "snow-showers",
+  "95": "thunderstorm",
+  "96": "thunderstorm",
+  "99": "thunderstorm"
+}

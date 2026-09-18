@@ -1,0 +1,490 @@
+#!/usr/bin/env python3
+"""One-shot owner for Kona's transient Arch and scratch workspaces."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import platform
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+
+ARCH_CLASSES = {
+    "processes": "KonaArchProcesses",
+    "system": "KonaArchSystem",
+    "audio": "KonaArchAudio",
+}
+SCRATCH_CLASS = "KonaScratch"
+ARCH_WORKSPACE = "special:arch"
+SCRATCH_WORKSPACE = "special:scratch"
+
+
+class WorkspaceError(RuntimeError):
+    pass
+
+
+def run(arguments: list[str], *, env: dict[str, str] | None = None, timeout: float = 3) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(arguments, capture_output=True, text=True, check=False, timeout=timeout, env=env)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise WorkspaceError(f"cannot run {arguments[0]}: {error}") from error
+
+
+def canonical_instance() -> dict[str, object]:
+    result = run(["hyprctl", "instances", "-j"])
+    try:
+        instances = json.loads(result.stdout) if result.returncode == 0 else []
+    except json.JSONDecodeError as error:
+        raise WorkspaceError("Hyprland instance inventory is invalid") from error
+    live = []
+    for value in instances if isinstance(instances, list) else []:
+        try:
+            pid = int(value["pid"])
+            started = int(value["time"])
+            signature = str(value["instance"])
+            display = str(value["wl_socket"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if pid > 0 and Path(f"/proc/{pid}").exists() and signature and display:
+            live.append((started, pid, signature, display))
+    if not live:
+        raise WorkspaceError("no live Hyprland session exists")
+    started, pid, signature, display = min(live)
+    return {"time": started, "pid": pid, "instance": signature, "wl_socket": display}
+
+
+def session_environment(instance: dict[str, object]) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update({
+        "XDG_RUNTIME_DIR": environment.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"),
+        "HYPRLAND_INSTANCE_SIGNATURE": str(instance["instance"]),
+        "WAYLAND_DISPLAY": str(instance["wl_socket"]),
+    })
+    return environment
+
+
+def hypr(instance: dict[str, object], *arguments: str, json_output: bool = False) -> object:
+    command = ["hyprctl", "-i", str(instance["instance"])]
+    if json_output:
+        command.append("-j")
+    command.extend(arguments)
+    result = run(command)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown IPC failure"
+        raise WorkspaceError(f"Hyprland IPC failed: {detail}")
+    if not json_output:
+        return result.stdout
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise WorkspaceError("Hyprland returned invalid JSON") from error
+
+
+def clients(instance: dict[str, object]) -> list[dict[str, object]]:
+    values = hypr(instance, "clients", json_output=True)
+    return values if isinstance(values, list) else []
+
+
+def class_clients(instance: dict[str, object], classes: set[str]) -> list[dict[str, object]]:
+    return [value for value in clients(instance) if str(value.get("class", "")) in classes]
+
+
+def special_visible(instance: dict[str, object], name: str) -> bool:
+    values = hypr(instance, "monitors", json_output=True)
+    return any(value.get("specialWorkspace", {}).get("name") == name for value in values if isinstance(value, dict))
+
+
+def dispatch(instance: dict[str, object], expression: str) -> None:
+    hypr(instance, "dispatch", expression)
+
+
+def toggle_special(instance: dict[str, object], name: str) -> None:
+    dispatch(instance, f'hl.dsp.workspace.toggle_special("{name.removeprefix("special:")}")')
+
+
+def process_start_ticks(pid: int) -> int | None:
+    try:
+        return int(Path(f"/proc/{pid}/stat").read_text().split()[21])
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def process_group_alive(record: dict[str, object]) -> bool:
+    """Match descendants after Kitty exits without trusting a recycled PGID."""
+    try:
+        pgid = int(record["pgid"])
+        launched = int(record["start_ticks"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    for stat in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            fields = stat.read_text().rsplit(")", 1)[1].split()
+            member_group = int(fields[2])
+            started = int(fields[19])
+        except (OSError, IndexError, ValueError):
+            continue
+        if member_group == pgid and started >= launched:
+            return True
+    return False
+
+
+def state_path() -> Path:
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    return runtime / "kona-arch-workspace.json"
+
+
+def lock_path() -> Path:
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    return runtime / "kona-arch-workspace.lock"
+
+
+def read_state() -> dict[str, object]:
+    try:
+        value = json.loads(state_path().read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def write_state(value: dict[str, object]) -> None:
+    destination = state_path()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=destination.name + ".", dir=destination.parent)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(value, stream, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def appearance() -> dict[str, str]:
+    config = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+    try:
+        value = json.loads((config / "kona/theme/current/appearance.json").read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise WorkspaceError("current Kona appearance tokens are unavailable") from error
+    required = {"background", "surface", "text", "text_secondary", "text_muted", "accent", "outline", "focus"}
+    if not required <= value.keys() or any(not isinstance(value[key], str) for key in required):
+        raise WorkspaceError("current Kona appearance tokens are incomplete")
+    return value
+
+
+def render_btop_theme() -> Path:
+    tokens = appearance()
+    directory = state_path().parent / "kona-arch-btop"
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    destination = directory / "kona-arch.theme"
+    colours = {
+        "main_bg": "",
+        "main_fg": tokens["text"],
+        "title": tokens["text"],
+        "hi_fg": tokens["accent"],
+        "selected_bg": tokens["accent"],
+        "selected_fg": tokens["background"],
+        "inactive_fg": tokens["text_muted"],
+        "proc_misc": tokens["text_secondary"],
+        "cpu_box": tokens["outline"],
+        "mem_box": tokens["outline"],
+        "net_box": tokens["outline"],
+        "proc_box": tokens["outline"],
+        "div_line": tokens["outline"],
+    }
+    for group in ("temp", "cpu", "free", "cached", "available", "used", "download", "upload"):
+        colours[f"{group}_start"] = tokens["text_muted"]
+        colours[f"{group}_mid"] = tokens["text_secondary"]
+        colours[f"{group}_end"] = tokens["accent"]
+    destination.write_text("\n".join(f'theme[{key}]="{value}"' for key, value in colours.items()) + "\n")
+    return directory
+
+
+def required_commands() -> list[str]:
+    missing = []
+    for command in ("kitty", "btop", "fastfetch", "cava", "pacman", "hyprctl"):
+        if run(["sh", "-lc", f"command -v {command}"]).returncode:
+            missing.append(command)
+    return missing
+
+
+def component_commands(theme_directory: Path) -> list[tuple[str, list[str]]]:
+    home = Path.home()
+    config = Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config")))
+    common = ["kitty", "--override", "remember_window_size=no", "--override", "window_padding_width=10"]
+    return [
+        ("processes", common + ["--class", ARCH_CLASSES["processes"], "--title", "arch — processes", "btop", "--config", str(config / "btop/kona-arch.conf"), "--themes-dir", str(theme_directory), "--preset", "1"]),
+        ("system", common + ["--override", "font_size=9.5", "--override", "window_padding_width=8", "--class", ARCH_CLASSES["system"], "--title", "arch — system", str(home / ".local/bin/kona-arch-system-shell")]),
+        ("audio", common + ["--class", ARCH_CLASSES["audio"], "--title", "arch — audio", "cava", "-p", str(config / "cava/kona-arch.conf")]),
+    ]
+
+
+def wait_for_class(instance: dict[str, object], class_name: str, process: subprocess.Popen[bytes], timeout: float = 3) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if any(value.get("class") == class_name for value in clients(instance)):
+            return
+        code = process.poll()
+        if code is not None:
+            raise WorkspaceError(f"{class_name} exited before its window appeared (status {code})")
+        time.sleep(0.04)
+    raise WorkspaceError(f"timed out waiting for {class_name}")
+
+
+def tracked_processes(state: dict[str, object]) -> list[dict[str, object]]:
+    values = state.get("processes", [])
+    return [value for value in values if isinstance(value, dict)] if isinstance(values, list) else []
+
+
+def infer_client_records(values: list[dict[str, object]]) -> list[dict[str, object]]:
+    records = []
+    seen_groups = set()
+    for value in values:
+        try:
+            pid = int(value["pid"])
+            pgid = os.getpgid(pid)
+        except (KeyError, TypeError, ValueError, ProcessLookupError, PermissionError):
+            continue
+        started = process_start_ticks(pid)
+        if started is None or pgid in seen_groups:
+            continue
+        seen_groups.add(pgid)
+        records.append({
+            "name": str(value.get("class", "arch-client")),
+            "pid": pid,
+            "pgid": pgid,
+            "start_ticks": started,
+        })
+    return records
+
+
+def terminate_record(record: dict[str, object], force: bool = False) -> None:
+    if not process_group_alive(record):
+        return
+    try:
+        pgid = int(record["pgid"])
+        os.killpg(pgid, signal.SIGKILL if force else signal.SIGTERM)
+    except (KeyError, TypeError, ValueError, ProcessLookupError, PermissionError):
+        return
+
+
+def close_arch(instance: dict[str, object], *, quiet: bool = False) -> None:
+    state = read_state()
+    records = tracked_processes(state)
+    managed = class_clients(instance, set(ARCH_CLASSES.values()))
+    known_groups = {value.get("pgid") for value in records}
+    records.extend(value for value in infer_client_records(managed) if value.get("pgid") not in known_groups)
+    for value in managed:
+        address = str(value.get("address", ""))
+        if address:
+            try:
+                dispatch(instance, f'hl.dsp.window.close({{ window = "address:{address}" }})')
+            except WorkspaceError:
+                pass
+    deadline = time.monotonic() + 0.8
+    while time.monotonic() < deadline and any(process_group_alive(value) for value in records):
+        time.sleep(0.04)
+    for value in records:
+        terminate_record(value)
+    deadline = time.monotonic() + 0.8
+    while time.monotonic() < deadline and any(process_group_alive(value) for value in records):
+        time.sleep(0.04)
+    for value in records:
+        terminate_record(value, force=True)
+    deadline = time.monotonic() + 0.4
+    while time.monotonic() < deadline and any(process_group_alive(value) for value in records):
+        time.sleep(0.04)
+    try:
+        state_path().unlink()
+    except FileNotFoundError:
+        pass
+    if special_visible(instance, ARCH_WORKSPACE):
+        toggle_special(instance, ARCH_WORKSPACE)
+    remaining = class_clients(instance, set(ARCH_CLASSES.values()))
+    if remaining:
+        raise WorkspaceError(f"{len(remaining)} Arch window(s) remained after cleanup")
+    survivors = [value for value in records if process_group_alive(value)]
+    if survivors:
+        raise WorkspaceError(f"{len(survivors)} Arch process group(s) survived cleanup")
+    if not quiet:
+        print("Arch workspace closed; all tracked processes released")
+
+
+def open_arch(instance: dict[str, object], *, focus_system: bool = False) -> None:
+    missing = required_commands()
+    if missing:
+        raise WorkspaceError("missing required command(s): " + ", ".join(missing))
+    required_classes = set(ARCH_CLASSES.values())
+    existing = class_clients(instance, required_classes)
+    existing_classes = {str(value.get("class", "")) for value in existing}
+    if existing_classes == required_classes:
+        if not special_visible(instance, ARCH_WORKSPACE):
+            toggle_special(instance, ARCH_WORKSPACE)
+        target = ARCH_CLASSES["system" if focus_system else "processes"]
+        dispatch(instance, f'hl.dsp.focus({{ window = "class:^{target}$" }})')
+        return
+    records = tracked_processes(read_state())
+    if existing or any(process_group_alive(value) for value in records):
+        close_arch(instance, quiet=True)
+    theme_directory = render_btop_theme()
+    environment = session_environment(instance)
+    state: dict[str, object] = {
+        "schema": 1,
+        "instance": instance["instance"],
+        "opened_at": int(time.time()),
+        "processes": [],
+    }
+    toggle_special(instance, ARCH_WORKSPACE)
+    try:
+        for name, command in component_commands(theme_directory):
+            process = subprocess.Popen(
+                command,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            start_ticks = process_start_ticks(process.pid)
+            if start_ticks is None:
+                raise WorkspaceError(f"failed to identify {name} process")
+            record = {
+                "name": name,
+                "class": ARCH_CLASSES[name],
+                "pid": process.pid,
+                "pgid": os.getpgid(process.pid),
+                "start_ticks": start_ticks,
+            }
+            state["processes"].append(record)
+            write_state(state)
+            wait_for_class(instance, ARCH_CLASSES[name], process)
+        target = ARCH_CLASSES["system" if focus_system else "processes"]
+        dispatch(instance, f'hl.dsp.focus({{ window = "class:^{target}$" }})')
+    except Exception:
+        close_arch(instance, quiet=True)
+        raise
+    print("Arch workspace opened")
+
+
+def focus_system(instance: dict[str, object]) -> None:
+    open_arch(instance, focus_system=True)
+
+
+def toggle_scratch(instance: dict[str, object]) -> None:
+    existing = class_clients(instance, {SCRATCH_CLASS})
+    if existing:
+        toggle_special(instance, SCRATCH_WORKSPACE)
+        return
+    environment = session_environment(instance)
+    process = subprocess.Popen(
+        [
+            "kitty", "--class", SCRATCH_CLASS, "--title", "scratch — fish",
+            "--override", "remember_window_size=no",
+            "--override", "font_size=13",
+            "--override", "window_padding_width=26",
+            "--override", "background_opacity=0.92",
+            "--override", "cursor_shape=beam",
+            "--override", "cursor_blink_interval=0.6",
+            "--override", "tab_bar_style=hidden",
+            str(Path.home() / ".local/bin/kona-scratch-shell"),
+        ],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    wait_for_class(instance, SCRATCH_CLASS, process)
+    if not special_visible(instance, SCRATCH_WORKSPACE):
+        toggle_special(instance, SCRATCH_WORKSPACE)
+    dispatch(instance, f'hl.dsp.focus({{ window = "class:^{SCRATCH_CLASS}$" }})')
+
+
+def package_count() -> str:
+    result = run(["pacman", "-Qq"], timeout=4)
+    return str(len(result.stdout.splitlines())) if result.returncode == 0 else "unavailable"
+
+
+def failed_units(user: bool = False) -> str:
+    command = ["systemctl"] + (["--user"] if user else []) + ["--failed", "--no-legend", "--plain"]
+    result = run(command, timeout=4)
+    return str(len([line for line in result.stdout.splitlines() if line.strip()])) if result.returncode == 0 else "unavailable"
+
+
+def waybar(instance: dict[str, object]) -> None:
+    version = hypr(instance, "version", json_output=True)
+    hypr_version = str(version.get("tag", version.get("version", "unknown"))) if isinstance(version, dict) else "unknown"
+    is_open = bool(class_clients(instance, set(ARCH_CLASSES.values())))
+    tooltip = "\n".join([
+        "Arch Linux",
+        f"Kernel {platform.release()}",
+        f"Hyprland {hypr_version}",
+        f"Packages {package_count()}",
+        f"Failed units {failed_units()} system / {failed_units(True)} user",
+        "Left click: Arch workspace",
+        "Right click: system terminal",
+    ])
+    print(json.dumps({"text": "󰣇  KONA", "tooltip": tooltip, "class": "open" if is_open else "closed"}))
+
+
+def status(instance: dict[str, object]) -> dict[str, object]:
+    managed = class_clients(instance, set(ARCH_CLASSES.values()))
+    state = read_state()
+    return {
+        "open": bool(managed),
+        "visible": special_visible(instance, ARCH_WORKSPACE),
+        "windows": sorted(str(value.get("class")) for value in managed),
+        "tracked_processes": [
+            {"name": value.get("name"), "pid": value.get("pid"), "alive": process_group_alive(value)}
+            for value in tracked_processes(state)
+        ],
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("toggle", "open", "close", "system", "scratch", "status", "waybar"), nargs="?", default="toggle")
+    arguments = parser.parse_args()
+    instance = canonical_instance()
+    if arguments.command == "status":
+        print(json.dumps(status(instance), sort_keys=True))
+        return 0
+    if arguments.command == "waybar":
+        waybar(instance)
+        return 0
+    lock_path().parent.mkdir(parents=True, exist_ok=True)
+    with lock_path().open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if arguments.command == "toggle":
+            if class_clients(instance, set(ARCH_CLASSES.values())) or any(process_group_alive(value) for value in tracked_processes(read_state())):
+                close_arch(instance)
+            else:
+                open_arch(instance)
+        elif arguments.command == "open":
+            open_arch(instance)
+        elif arguments.command == "close":
+            close_arch(instance)
+        elif arguments.command == "system":
+            focus_system(instance)
+        elif arguments.command == "scratch":
+            toggle_scratch(instance)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except WorkspaceError as error:
+        print(f"kona-arch-workspace: {error}", file=sys.stderr)
+        raise SystemExit(1)

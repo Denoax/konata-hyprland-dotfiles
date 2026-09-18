@@ -1,0 +1,119 @@
+{
+  "waveform": {
+    "file": "music/ui/waveform.png",
+    "source_bbox": [
+      335,
+      61,
+      1161,
+      418
+    ],
+    "size": [
+      826,
+      357
+    ]
+  },
+  "shuffle_alt": {
+    "file": "music/ui/shuffle_alt.png",
+    "source_bbox": [
+      378,
+      447,
+      633,
+      650
+    ],
+    "size": [
+      255,
+      203
+    ]
+  },
+  "speaker": {
+    "file": "music/ui/speaker.png",
+    "source_bbox": [
+      881,
+      470,
+      1072,
+      625
+    ],
+    "size": [
+      191,
+      155
+    ]
+  },
+  "volume_slider": {
+    "file": "music/ui/volume_slider.png",
+    "source_bbox": [
+      446,
+      653,
+      1003,
+      771
+    ],
+    "size": [
+      557,
+      118
+    ]
+  },
+  "seek_slider": {
+    "file": "music/ui/seek_slider.png",
+    "source_bbox": [
+      137,
+      769,
+      1313,
+      880
+    ],
+    "size": [
+      1176,
+      111
+    ]
+  },
+  "bubble_large": {
+    "file": "music/ui/bubble_large.png",
+    "source_bbox": [
+      515,
+      895,
+      669,
+      1050
+    ],
+    "size": [
+      154,
+      155
+    ]
+  },
+  "bubble_medium": {
+    "file": "music/ui/bubble_medium.png",
+    "source_bbox": [
+      665,
+      876,
+      773,
+      985
+    ],
+    "size": [
+      108,
+      109
+    ]
+  },
+  "bubble_small": {
+    "file": "music/ui/bubble_small.png",
+    "source_bbox": [
+      768,
+      949,
+      844,
+      1027
+    ],
+    "size": [
+      76,
+      78
+    ]
+  },
+  "bubble_tiny": {
+    "file": "music/ui/bubble_tiny.png",
+    "source_bbox": [
+      867,
+      950,
+      927,
+      1011
+    ],
+    "size": [
+      60,
+      61
+    ]
+  }
+}

@@ -47,17 +47,17 @@ class WaybarContracts(unittest.TestCase):
         self.assertNotIn('hyprland/workspaces', owners)
         self.assertEqual(owners['hyprland/window'], ['HDMI-A-1'])
 
-    def test_existing_commands_remain_available(self):
+    def test_existing_commands_and_arch_entrypoint_remain_available(self):
         modules = {k: v for b in BARS for k, v in b.items() if isinstance(v, dict)}
         actions = {
-            ('custom/kona', 'on-click'): 'rofi -show drun -theme ~/.config/rofi/konata.rasi',
-            ('custom/kona', 'on-click-right'): '~/.local/bin/kona-quick-settings',
+            ('custom/kona', 'on-click'): '~/.local/bin/kona-arch-workspace toggle',
+            ('custom/kona', 'on-click-right'): '~/.local/bin/kona-arch-workspace system',
             ('network', 'on-click'): 'nm-connection-editor',
             ('pulseaudio', 'on-click'): 'wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle',
             ('pulseaudio', 'on-click-right'): 'pavucontrol',
             ('custom/recording', 'on-click'): '~/.local/bin/kona-record output',
             ('custom/gaming', 'on-click'): '~/.local/bin/kona-game-mode toggle',
-            ('custom/notifications', 'on-click'): 'swaync-client -t -sw',
+            ('custom/notifications', 'on-click'): '~/.local/bin/kona-dashboard --toggle',
             ('custom/notifications', 'on-click-right'): 'swaync-client -d -sw',
         }
         for (name, action), command in actions.items():
@@ -67,6 +67,9 @@ class WaybarContracts(unittest.TestCase):
         self.assertIn('%V', modules['clock']['format-alt'])
         self.assertEqual(modules['hyprland/window']['rewrite'][''], 'KONATA@ARCH')
         self.assertEqual(modules['hyprland/window']['max-length'], 42)
+        hyprland = (ROOT / '.config/hypr/hyprland.lua').read_text()
+        self.assertIn('bindSuper("SPACE", hl.dsp.exec_cmd(launcher))', hyprland)
+        self.assertIn('local launcher = "rofi -show drun', hyprland)
 
     def test_hardware_is_native_drawer_with_existing_cadence(self):
         right = next(b for b in BARS if b['output'] == 'HDMI-A-5')

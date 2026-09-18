@@ -30,6 +30,7 @@ PREVIEW_THEME = RUNTIME / 'kona/wallpaper-preview-theme'
 SCENE_IMAGES = CONFIG / 'scene-images.json'
 MOSAIC = RUNTIME / 'kona/mosaic-return.json'
 MOSAIC_THEME = RUNTIME / 'kona/mosaic-return-theme'
+WALLPAPER_ENGINE_STATE = STATE / 'kona/wallpaper-engine.json'
 
 
 def run(args, timeout=15):
@@ -83,8 +84,24 @@ def wallpaper_mode():
 def view():
     p = intent()['profile']
     mode = wallpaper_mode()
+    wallpaper = {'mode': mode, 'backend': 'hyprpaper' if p in ('focus', 'gaming') else 'awww'}
+    engine = read_json(WALLPAPER_ENGINE_STATE, {})
+    if isinstance(engine, dict) and engine.get('schema') == 1:
+        for saved in engine.get('processes', []):
+            if not isinstance(saved, dict) or not isinstance(saved.get('pid'), int):
+                continue
+            current = identity(saved['pid'])
+            try:
+                executable = (Path('/proc') / str(saved['pid']) / 'exe').resolve(strict=True)
+            except OSError:
+                executable = None
+            if (current and current['start_ticks'] == saved.get('start_ticks') and executable and
+                    executable.name == 'linux-wallpaperengine'):
+                wallpaper.update({'backend': 'linux-wallpaperengine', 'workshop': {
+                    'id': engine.get('id'), 'title': engine.get('title'), 'type': engine.get('type')}})
+                break
     return {'profile': p, 'return_to': intent()['return_to'], 'scene': next(k for k, v in SCENES.items() if v == mode),
-            'wallpaper': {'mode': mode, 'backend': 'hyprpaper' if p in ('focus', 'gaming') else 'awww'}}
+            'wallpaper': wallpaper}
 
 
 def options():

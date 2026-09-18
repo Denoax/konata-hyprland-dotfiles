@@ -219,7 +219,7 @@ def action(name,value):
         return 'Preset applied'
     if name=='open':
         commands={'overview':[BIN/'kona-overview'],'capture':[BIN/'kona-screenshot','region-edit'],
-                  'audio':[BIN/'kona-audio-menu'],'notifications':['swaync-client','-t','-sw'],
+                  'audio':[BIN/'kona-audio-menu'],'notifications':[BIN/'kona-dashboard','--toggle'],
                   'wallpaper-fallback':[BIN/'kona-wallpaper-menu'],'launcher':['rofi','-show','drun','-theme',str(HOME/'.config/rofi/konata.rasi')],
                   'updates':[BIN/'kona-updates'],'recovery':['kitty','--hold','hyprctl','configerrors']}
         if value not in commands:raise ValueError('unknown action')

@@ -67,7 +67,7 @@ Item {
             const subtitle = findChild(view, "headerSystemSubtitle");
             const status = findChild(view, "headerProfile");
             compare(title.text, "KONA");
-            compare(subtitle.text, "Arch Linux / Hyprland");
+            compare(subtitle.text, "Arch Linux · Hyprland");
             compare(status.visible, false);
             view.statusLabel = "Focus profile"; compare(status.visible, true);
             waitForRendering(view);

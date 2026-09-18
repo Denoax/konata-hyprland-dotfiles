@@ -56,5 +56,28 @@ class MusicHost(unittest.TestCase):
         finally:
             if host.poll() is None:host.terminate();host.wait(timeout=6)
 
+    def test_native_surface_preserves_real_backend_controls(self):
+        view = (ROOT / '.config/quickshell/kona/music/MusicPopupView.qml').read_text()
+        shell = (ROOT / '.config/quickshell/kona/music/shell.qml').read_text()
+        self.assertIn('width: 1260', view)
+        self.assertIn('height: 252', view)
+        self.assertNotIn('music_shell_', view)
+        self.assertIn('radius: 30', view)
+        self.assertIn('maskSource: albumMask', view)
+        self.assertIn('requestSeek', view)
+        self.assertIn('requestVolume', view)
+        self.assertIn('requestDeviceMenu', view)
+        self.assertIn('values: root.spectrumValues', view)
+        self.assertIn('running: root.opened && !!root.player && root.player.isPlaying', shell)
+        self.assertIn('Pipewire.defaultAudioSink', shell)
+        for asset in ('shuffle', 'previous', 'play', 'pause', 'next', 'repeat', 'device'):
+            self.assertTrue((ROOT / f'.config/quickshell/kona/music/assets/light/{asset}.svg').is_file())
+            self.assertTrue((ROOT / f'.config/quickshell/kona/music/assets/dark/{asset}.svg').is_file())
+        self.assertIn('root.icon("shuffle")', view)
+        self.assertIn('root.icon(root.playing ? "pause" : "play")', view)
+        self.assertNotIn('ui/seek_slider.png', view)
+        self.assertNotIn('ui/volume_slider.png', view)
+        self.assertNotIn('ui/waveform.png', view)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

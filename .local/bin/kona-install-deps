@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-packages=(swayosd satty wf-recorder hyprsunset quickshell)
+packages=(swayosd satty wf-recorder hyprsunset quickshell fish)
 cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/kona-user-packages"
 install_root="$HOME/.local/opt/kona-pkgs"
 mkdir -p "$cache_root" "$install_root"
@@ -9,7 +9,7 @@ mkdir -p "$cache_root" "$install_root"
 for package in "${packages[@]}"; do
   url="$(pacman -Sp --print-format '%l' "$package" 2>/dev/null | tail -n1)"
   if [[ -z "$url" ]]; then
-    printf 'Could not resolve the Arch package URL for %s. Try: sudo pacman -Sy %s\n' "$package" "$package" >&2
+    printf 'Could not resolve the Arch package URL for %s. Install it through your normal full-system update workflow.\n' "$package" >&2
     exit 1
   fi
   archive="$cache_root/$package.pkg.tar.zst"

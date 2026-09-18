@@ -16,6 +16,7 @@ ShellRoot {
     property string initialAction: ""
     property string lastActiveAddress: ""
     property int toplevelRevision: 0
+    property var weatherData: ({status: "loading"})
     readonly property var historyActiveToplevel: Hyprland.toplevels.values.find(value =>
         value.lastIpcObject && Number(value.lastIpcObject.focusHistoryID) === 0) || null
     readonly property string activeAddress: Hyprland.activeToplevel ? Hyprland.activeToplevel.address
@@ -102,6 +103,17 @@ ShellRoot {
         property real gain: 0.35
     }
     SidebarPolicy { id: policy }
+    Process {
+        id: weatherSummary
+        command: [Quickshell.env("HOME") + "/.local/bin/kona-weather", "status"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { root.weatherData = JSON.parse(text); }
+                catch (error) { root.weatherData = ({status:"error", message:"Weather response was invalid"}); }
+            }
+        }
+    }
     Timer {
         id: toplevelRefresh
         interval: 80
@@ -166,6 +178,7 @@ ShellRoot {
         const bin = home + "/.local/bin/";
         const actions = {
             "music.open": [bin + "kona-music-popup"],
+            "weather.open": [bin + "kona-weather-popup"],
             "applications.open": ["rofi", "-show", "drun", "-theme", home + "/.config/rofi/konata.rasi"],
             "windows.open": ["rofi", "-show", "window", "-theme", home + "/.config/rofi/window.rasi"],
             "overview.open": [bin + "kona-overview"],
@@ -174,7 +187,7 @@ ShellRoot {
             "network.open": ["nm-connection-editor"],
             "bluetooth.open": ["blueman-manager"],
             "night.toggle": [bin + "kona-night-light", "toggle"],
-            "notifications.open": ["swaync-client", "-t", "-sw"],
+            "notifications.open": [bin + "kona-dashboard", "--toggle"],
             "clipboard.open": [bin + "kona-clipboard"],
             "screenshot.open": [bin + "kona-screenshot", "region-edit"],
             "wallpaper.open": [bin + "kona-wallpaper-menu"],
@@ -302,8 +315,9 @@ ShellRoot {
             height: panel.height
             expanded: saved.expanded
             revealed: visibility.revealed
-            statusLabel: policy.profileName ? policy.profileName[0].toUpperCase() + policy.profileName.slice(1) + " profile" : ""
+            statusLabel: policy.profileName ? policy.profileName[0].toUpperCase() + policy.profileName.slice(1) : ""
             player: root.player
+            weather: root.weatherData
             workspaces: root.workspaceModel
             applications: root.applicationModel
             runningApplications: root.runningApplicationModel

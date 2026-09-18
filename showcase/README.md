@@ -1,16 +1,19 @@
-# Current showcase
+# V3 showcase
 
-All files in `assets/` are captures of the installed Kona desktop on 2026-09-16. They are presentation artifacts, not functional UI or design mockups.
+`assets/v3/` contains real rendered captures of Kona Desktop V3 taken on 2026-09-17. They are documentation media, never functional UI assets.
 
-| Asset | Source |
+| Asset | What it proves |
 | --- | --- |
-| `hero-dark.webp` | Real three-output Grim capture with the Mono Rain scene and live sidebar |
-| `sidebar-dark.webp` | DP-4 capture after `kona-appearance dark` |
-| `sidebar-light.webp` | DP-4 capture after `kona-appearance light` |
-| `sidebar-reveal.webp` | Real DP-4 `wf-recorder` capture of reveal and auto-hide |
-| `music-popup.webp` | Native Quickshell popup with live MPRIS metadata |
-| `control-center.webp` | Current SwayNC notification/control center; no history was cleared |
-| `launcher.webp` | Current Rofi application launcher |
-| `lockscreen.webp` | Native Hyprlock capture with an empty password field |
+| `hero-triple.webp` | Real three-output Wallpaper Engine composition |
+| `sidebar-rail-{dark,light}.webp` | Shared sidebar geometry under both semantic appearances |
+| `sidebar-motion.gif` | Native Quickshell reveal/collapse motion |
+| `weather-{dark,light}.webp` | Same Weather geometry with real Open-Meteo demo data |
+| `music-{dark,light}.webp` | MPRIS controls and current semantic appearance |
+| `arch-workspace-dark.webp` | Native Hyprland tiling with real Btop, Fastfetch and CAVA |
+| `terminal-dark.webp` | Current Kitty/Fish/Fastfetch composition |
+| `command-center-dark.webp` | Current Rofi desktop action surface |
+| `lockscreen.webp` | Native Hyprlock surface with empty password state |
 
-The desktop was staged on empty workspaces 7–9. The original workspaces, appearance, focus, cursor and notification state were restored after capture. The repository does not include the runtime evidence directory or notification contents outside the selected control-center screenshot.
+## Privacy boundary
+
+Captures were staged on empty workspaces. Public demo Weather and MPRIS data were used only during capture and then removed. Process names, local paths, account names, IP addresses, Wi-Fi identities, notification history, personal files and application windows are absent. Normal workspaces, minimized windows, focus, appearance, profile, audio level and user Weather state were restored after capture.

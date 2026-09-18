@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Install portable test dependency
-        run: sudo apt-get update && sudo apt-get install -y lua5.4 rsync
+      - name: Install portable test dependencies
+        run: sudo apt-get update && sudo apt-get install -y lua5.4 python3-gi rsync
       - name: Shell syntax
         run: |
           python3 - <<'PY'
@@ -42,10 +42,12 @@ jobs:
         run: |
           set -e
           for test in \
-            appearance.py event-state.py lockscreen.py mono-rain.py music-popup.py \
+            appearance.py arch-workspace.py control-center.py event-state.py \
+            lockscreen.py mono-rain.py music-popup.py \
             profiles.py repository.py rofi-surfaces.py runtime.py sidebar-host.py \
             sidebar-navigation.py theme.py unified-menus.py v4.py \
-            wallpaper-theme.py waybar.py
+            wallpaper-engine.py wallpaper-theme.py waybar.py weather.py \
+            weather-popup.py
           do
             python3 "tests/$test"
           done

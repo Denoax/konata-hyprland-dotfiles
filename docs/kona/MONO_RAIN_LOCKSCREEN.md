@@ -1,6 +1,6 @@
-# Kona Mono Rain lockscreen
+# Kona lock screen
 
-Status: **accepted in the 2026-09-16 release checkpoint**
+Status: **current V3 implementation**
 
 This checkpoint changes only the Hyprlock surface. Hyprlock remains the session-lock and
 input owner, and the system PAM stack remains the authentication path. No QML password UI,
@@ -8,11 +8,12 @@ key forwarder, custom authenticator, resident animation daemon, or PAM change wa
 
 ## Native composition
 
-- DP-4 renders the supplied static Konata/flower base, one deterministic 80-frame rain
-  label, a native Hyprlock card, real time/date, supplied circular avatar, `KONA`, the real
-  `$USER`, and one native masked `input-field`.
-- HDMI-A-1 and HDMI-A-5 render the supplied composition-matched static fallback without
-  duplicating the authentication card.
+- All outputs render the tracked native-resolution snapshot of Kona's selected Wallpaper
+  Engine scene. Hyprlock 0.9.6 cannot use the live renderer as a background, so the lock
+  keeps an opaque captured frame rather than exposing the unlocked session.
+- DP-4 adds one deterministic 80-frame rain label, a native Hyprlock card, real time/date,
+  the shared profile avatar, `KONA`, the real `$USER`, and one native masked `input-field`.
+- HDMI-A-1 and HDMI-A-5 keep the shared backdrop without duplicating the authentication card.
 - Rain updates every 125 ms through one transient command surface. Konata and the flowers
   never animate.
 - `fadeIn`, `fadeOut`, `inputFieldDots`, and `inputFieldColors` are native Hyprlock 0.9.6
@@ -31,6 +32,8 @@ does not shorten a grace period that was never active.
 ## Files
 
 - `.config/hypr/hyprlock.conf`
+- `.config/kona/lockscreen/current-wallpaper/konata-workshop-3569997458.png`
+- `.config/kona/lockscreen/current-wallpaper/PROVENANCE.md`
 - `.config/kona/lockscreen/mono-rain/background/konata-lock-base.png`
 - `.config/kona/lockscreen/mono-rain/background/konata-lock-static-fallback.png`
 - `.config/kona/lockscreen/mono-rain/avatar/konata-avatar-512.png`
@@ -97,7 +100,5 @@ Rollback is scoped to restoring the matching backed-up Hyprlock config. The new 
 asset directory is isolated under `.config/kona/lockscreen/mono-rain`; no other Kona owner
 depends on it.
 
-Branch `kona-v3/task01-event-state`, HEAD
-`dac844f554e37eef9368fbf26860be65237422de`; the accepted dirty tree remains intact. No Git
-history/remote operation, compositor restart, UWSM change, idle request, application freeze,
-notification clear, PAM edit, or long benchmark occurred.
+The original implementation evidence remains historical; `docs/CURRENT_STATUS.md` is the
+authoritative release state.

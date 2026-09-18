@@ -1,0 +1,7 @@
+User-supplied Fastfetch identity asset.
+Source: user-supplied local file konata-izumi-lucky-star-anime-character-lao-thumbnail.webp
+SHA-256: 138f67cd6d0aa8cc845a47f74e7e0462104a2920943e4d5bd084a3ee733418e8
+Received: 2026-09-17
+Runtime PNG: kona-wink-thumb.png
+Runtime PNG SHA-256: 8cd5d8858c3916d5a9396633275cfb3c18dafa393bac8099ae6c77ef383e029a
+Conversion: FFmpeg WebP decode plus deterministic removal of border-connected neutral checkerboard cells; character pixels are otherwise unchanged

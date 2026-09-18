@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec kitty \
+    --class KonaTerminal \
+    --title 'kona — terminal' \
+    --override remember_window_size=no \
+    --override font_size=12.5 \
+    --override window_padding_width=22 \
+    --override background_opacity=0.90 \
+    --override cursor_shape=beam \
+    --override cursor_blink_interval=0.6 \
+    --override tab_bar_style=hidden \
+    "$HOME/.local/bin/kona-scratch-shell" terminal

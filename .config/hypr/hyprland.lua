@@ -1,7 +1,7 @@
 -- Konata Command Center
 -- Hyprland 0.56+ Lua configuration for a three-monitor Arch setup.
 
-local terminal = "kitty"
+local terminal = "~/.local/bin/kona-terminal"
 local launcher = "rofi -show drun -theme ~/.config/rofi/konata.rasi"
 local fileManager = "xdg-open ~"
 local browser = "gtk-launch com.brave.Browser"
@@ -190,6 +190,7 @@ hl.workspace_rule({ workspace = "7", monitor = "HDMI-A-1", persistent = true })
 hl.workspace_rule({ workspace = "8", monitor = "DP-4", persistent = true })
 hl.workspace_rule({ workspace = "9", monitor = "HDMI-A-5", persistent = true })
 hl.workspace_rule({ workspace = "10", monitor = "DP-4", persistent = true })
+hl.workspace_rule({ workspace = "special:arch", layout = "master", gaps_in = 8, gaps_out = 12, border_size = 1 })
 
 -- Theme data is two bounded RGB lines, never executable generated Lua. Missing or
 -- corrupt data retains the accepted cyan borders, including during clean recovery.
@@ -248,6 +249,12 @@ hl.config({
         preserve_split = true,
         smart_split = false,
         precise_mouse_move = true,
+    },
+    master = {
+        mfact = 0.62,
+        new_status = "slave",
+        new_on_top = false,
+        special_scale_factor = 0.98,
     },
     group = {
         auto_group = false,
@@ -323,6 +330,7 @@ hl.bind("SUPER + SUPER_L", function()
 end, { release = true, transparent = true })
 
 bindSuper("RETURN", hl.dsp.exec_cmd(terminal))
+hl.bind("ALT + RETURN", hl.dsp.exec_cmd(terminal))
 bindSuper("SHIFT + RETURN", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
 bindSuper("SPACE", hl.dsp.exec_cmd(launcher))
 bindSuper("E", hl.dsp.exec_cmd(fileManager))
@@ -343,6 +351,7 @@ hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config
 bindSuper("R", hl.dsp.exec_cmd("rofi -show run -theme ~/.config/rofi/run.rasi"))
 bindSuper("L", hl.dsp.exec_cmd("hyprlock"))
 bindSuper("D", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
+bindSuper("SHIFT + D", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace toggle"))
 bindSuper("M", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
 local function minimizeActiveWindow()
     local window = hl.get_active_window()
@@ -367,7 +376,7 @@ bindSuper("SHIFT + H", function()
 end)
 bindSuper("TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
 bindSuper("I", hl.dsp.exec_cmd("systemsettings"))
-bindSuper("A", hl.dsp.exec_cmd("swaync-client -t -sw"))
+bindSuper("A", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard --toggle"))
 bindSuper("SHIFT + A", hl.dsp.exec_cmd("~/.local/bin/kona-audio-menu"))
 bindSuper("CTRL + A", hl.dsp.exec_cmd("~/.local/bin/kona-app-mixer"))
 bindSuper("W", hl.dsp.exec_cmd("~/.local/bin/kona-overview"))
@@ -395,7 +404,7 @@ bindSuper("X", hl.dsp.exec_cmd("~/.local/bin/kona-desktop-menu --force"))
 -- Desktop and Konata controls.
 hl.bind("CTRL + mouse:273", hl.dsp.exec_cmd("~/.local/bin/kona-desktop-menu"), { click = true })
 bindSuper("CTRL + D", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
-bindSuper("N", hl.dsp.exec_cmd("swaync-client -t -sw"))
+bindSuper("N", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard --toggle"))
 bindSuper("SHIFT + N", hl.dsp.exec_cmd("~/.local/bin/kona-night-light toggle"))
 bindSuper("V", hl.dsp.exec_cmd("~/.local/bin/kona-clipboard"))
 bindSuper("CTRL + S", hl.dsp.exec_cmd("~/.local/bin/kona-session-save"))
@@ -433,7 +442,7 @@ for i = 1, 10 do
     end)
 end
 
-bindSuper("GRAVE", hl.dsp.workspace.toggle_special("scratch"))
+bindSuper("GRAVE", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace scratch"))
 bindSuper("SHIFT + GRAVE", hl.dsp.window.move({ workspace = "special:scratch" }))
 bindSuper("mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 bindSuper("mouse_up", hl.dsp.focus({ workspace = "e-1" }))
@@ -500,6 +509,36 @@ hl.window_rule({
     float = true,
     center = true,
     size = { 1380, 820 },
+})
+hl.window_rule({
+    name = "arch-workspace-terminals",
+    match = { class = "^KonaArch(Processes|System|Audio)$" },
+    workspace = "special:arch silent",
+    tile = true,
+    border_size = 1,
+    rounding = 8,
+    animation = "popin 97%",
+})
+hl.window_rule({
+    name = "kona-terminal",
+    match = { class = "^KonaTerminal$" },
+    float = true,
+    size = { 1240, 760 },
+    center = true,
+    border_size = 1,
+    rounding = 12,
+    animation = "popin 96%",
+})
+hl.window_rule({
+    name = "scratch-terminal",
+    match = { class = "^KonaScratch$" },
+    workspace = "special:scratch silent",
+    float = true,
+    size = { 1320, 780 },
+    center = true,
+    border_size = 1,
+    rounding = 12,
+    animation = "popin 96%",
 })
 hl.window_rule({
     name = "drag-to-tab-groups",

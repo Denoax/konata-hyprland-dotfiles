@@ -1,4 +1,4 @@
-# Mani's hardware profile
+# Reference hardware profile
 
 The checked-in layout describes the workstation where Kona is built and tested.
 
