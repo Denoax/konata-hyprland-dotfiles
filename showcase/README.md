@@ -1,20 +1,25 @@
 # V3 showcase
 
-`assets/v3/` contains the public V3 banner and real rendered captures of Kona Desktop V3 taken on 2026-09-17. They are documentation media, never functional UI assets.
+`assets/v3/` contains the public Kona Desktop V3 banner plus real compositor captures taken on 2026-09-18. Documentation media is never used as functional UI.
 
-| Asset | What it proves |
+| Asset group | What it proves |
 | --- | --- |
-| `kona-v3-banner.webp` | Public Arch/Kona identity artwork for the repository header |
-| `hero-triple.webp` | Real three-output Wallpaper Engine composition |
-| `sidebar-rail-{dark,light}.webp` | Shared sidebar geometry under both semantic appearances |
-| `sidebar-motion.gif` | Native Quickshell reveal/collapse motion |
-| `weather-{dark,light}.webp` | Same Weather geometry with real Open-Meteo demo data |
-| `music-{dark,light}.webp` | MPRIS controls and current semantic appearance |
-| `arch-workspace-dark.webp` | Native Hyprland tiling with real Btop, Fastfetch and CAVA |
-| `terminal-dark.webp` | Current Kitty/Fish/Fastfetch composition |
-| `command-center-dark.webp` | Current Rofi desktop action surface |
+| `kona-v3-banner.webp` | Decorative repository identity artwork |
+| `desktop-kona.webp` | Current wallpaper, connected top bar and quiet idle state |
+| `shell-tour.gif` | Fixed-camera sidebar, dashboard, media, audio and session motion |
+| `menu-tour.gif` | Fixed-camera assistant, cheat-sheet and Rofi surface motion |
+| `terminal-tour.gif` | Stable terminal, Arch-workspace and command-center sequence |
+| `dashboard-*`, `media-*`, `performance-*`, `weather-*` | Current Caelestia-backed dashboard tabs using real providers |
+| `sidebar-*` | Shared sidebar geometry in Light, Kona and Dark |
+| `notifications-kona.webp` | Current end-4 notification center with generic capture-time content |
+| `assistant-*`, `cheatsheet-*`, `settings-*`, `audio-*`, `session-*` | Current transient shell surfaces |
+| `profile-*`, `wallpaper-*`, `command-*` | Current Rofi menus |
+| `music-kona.webp` | Current MPRIS/PipeWire music popup |
+| `arch-workspace-dark.webp`, `terminal-dark.webp` | Sanitized native terminal composition |
 | `lockscreen.webp` | Native Hyprlock surface with empty password state |
 
 ## Privacy boundary
 
-Captures were staged on empty workspaces. Public demo Weather and MPRIS data were used only during capture and then removed. Process names, local paths, account names, IP addresses, Wi-Fi identities, notification history, personal files and application windows are absent. Normal workspaces, minimized windows, focus, appearance, profile, audio level and user Weather state were restored after capture.
+Captures were staged with application windows moved to a temporary ordinary workspace and restored by address afterward. Public Weather location and Wi-Fi labels are replaced with neutral presentation labels; notification content is a generic capture-time entry. Process names, local paths, account names, IP addresses, notification history, personal files and application windows are absent.
+
+Normal workspaces, applications, focus, appearance, profile, audio level and user Weather state were restored after capture. The GIFs use a fixed 1920×1080 compositor camera; they do not contain zoom/pan animation or added caption text.
