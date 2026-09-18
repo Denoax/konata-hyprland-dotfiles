@@ -21,8 +21,20 @@ Item {
     signal request(string actionId, var payload)
 
     onRevealProgressChanged: if (!revealed && revealProgress === 0) dismissed()
-    Behavior on revealProgress { NumberAnimation { duration: root.revealed ? Tokens.enterMs : Tokens.exitMs; easing.type: Easing.OutCubic } }
-    Behavior on expansionProgress { NumberAnimation { duration: root.expanded ? Tokens.enterMs : Tokens.exitMs; easing.type: Easing.OutCubic } }
+    Behavior on revealProgress {
+        NumberAnimation {
+            duration: root.revealed ? Tokens.enterMs : Tokens.exitMs
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.revealed ? Tokens.expressiveDefaultCurve : Tokens.expressiveFastCurve
+        }
+    }
+    Behavior on expansionProgress {
+        NumberAnimation {
+            duration: root.expanded ? Tokens.enterMs : Tokens.exitMs
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.expanded ? Tokens.expressiveDefaultCurve : Tokens.expressiveFastCurve
+        }
+    }
     visible: root.revealed || revealProgress > 0.001
     enabled: root.revealed
     opacity: revealProgress
@@ -31,7 +43,7 @@ Item {
     implicitHeight: 918
     clip: false
 
-    KSurface { anchors.fill: parent; radius: 15; glow: true; frostedEdge: true }
+    KSurface { anchors.fill: parent; radius: 22; glow: true; frostedEdge: true; surfaceOpacity: 0.97 }
     Rectangle {
         anchors.right: parent.right; width: 1; height: parent.height
         color: Tokens.glow
@@ -118,6 +130,15 @@ Item {
                         ]
                         onRequest: (id, args) => root.request(id, args)
                     }
+                    ActionSection {
+                        width: parent.width; title: "Tools"; iconName: "globe"; expanded: false
+                        entries: [
+                            {label: "Intelligence · Translate · Anime", icon: "heart", actionId: "assistant.open"},
+                            {label: "Files", icon: "folder", actionId: "files.open"},
+                            {label: "Cheat sheet", icon: "info", actionId: "cheatsheet.open"}
+                        ]
+                        onRequest: (id, args) => root.request(id, args)
+                    }
                 }
             }
 
@@ -156,6 +177,7 @@ Item {
                     {icon: "sun", action: "weather.open", label: "Weather"},
                     {icon: "apps", action: "applications.open", label: "Applications"},
                     {icon: "workspaces", action: "overview.open", label: "Workspaces"},
+                    {icon: "heart", action: "assistant.open", label: "Intelligence, translator and anime"},
                     {icon: "wrench", action: "controls.open", label: "Quick controls"},
                     {icon: "bell", action: "notifications.open", label: "Notifications"},
                     {icon: "settings", action: "settings.open", label: "Settings"}

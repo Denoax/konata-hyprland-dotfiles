@@ -8,16 +8,23 @@ hyprlock
 hyprpaper
 hyprpolkitagent
 quickshell
+# The Caelestia dashboard additionally requires the AUR package
+# caelestia-shell, whose quickshell-git dependency replaces this package.
 # Used for transient application/background scopes; the compositor session itself is plain Hyprland.
 uwsm
 waybar
-swaync
 swayosd
 rofi
 kitty
+foot
 btop
 fastfetch
 fish
+starship
+eza
+zoxide
+direnv
+translate-shell
 
 # Desktop integration
 xdg-desktop-portal-hyprland

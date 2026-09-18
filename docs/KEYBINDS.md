@@ -8,22 +8,23 @@ The authoritative definitions are in `.config/hypr/hyprland.lua`. This is the hu
 | --- | --- |
 | Tap `Super` | Pin/unpin the sidebar |
 | Hover left edge | Temporary sidebar reveal |
-| `Super + Space` | Application launcher |
-| `Super + Shift + Return` | Notification/control center |
+| `Super + Space` | end-4 live application search and workspace overview |
+| `Super + Shift + Return` | Caelestia dashboard |
 | `Super + Ctrl + Space` | Notification/control center |
 | `Super + C` | Quick settings |
-| `Super + Ctrl + I` | Kona Studio |
-| `Super + F1` | Shortcut reference |
+| `Super + A` | Intelligence, translator and anime |
+| `Super + I` / `Super + Ctrl + I` | Kona settings (Caelestia Nexus) |
+| `Super + F1` | Live keybinding cheat sheet |
 | `Super + Ctrl + M` | Kona Mosaic |
 | `Super + X` | Desktop menu |
 | `Ctrl + right-click` on desktop | Desktop menu |
 | `Super + V` | Clipboard history |
-| `Super + Shift + A` | Audio device menu |
+| `Super + Shift + A` | Caelestia audio mixer and device menu |
 | `Super + Ctrl + A` | Per-app audio mixer |
 | `Super + Ctrl + P` | Profile picker |
 | `Super + Shift + W` | Wallpaper picker |
-| `Super + W` | Workspace overview |
-| `Ctrl + Alt + Delete` or `Super + Escape` | Power/session menu |
+| `Super + W` | end-4 live application search and workspace overview |
+| `Ctrl + Alt + Delete` or `Super + Escape` | Caelestia power/session strip with Kona confirmations |
 
 ## Applications and windows
 
@@ -31,10 +32,10 @@ The authoritative definitions are in `.config/hypr/hyprland.lua`. This is the hu
 | --- | --- |
 | `Super + Return` / `Alt + Return` | Kona terminal |
 | `Super + Grave` | Toggle the single scratch terminal |
-| `Super + E` | Default file manager |
+| `Super + E` | First installed file manager (native app, Flatpak Dolphin, then Yazi) |
 | `Super + B` | Browser |
 | `Super + R` | Command launcher |
-| `Alt + Tab` / `Alt + Shift + Tab` | Window switcher |
+| `Alt + Tab` / `Alt + Shift + Tab` | end-4 live workspace and window overview |
 | `Alt + F4` or `Super + Q` | Close window |
 | `Super + F` | Fullscreen |
 | `Super + Shift + Space` | Toggle floating |

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+action="${1:-}"
+case "$action" in
+  --check)
+    printf '%s\n' 'actions=lock,logout,reboot,poweroff,hibernate confirmations=destructive owner=hyprlock,hyprctl,systemd'
+    exit 0
+    ;;
+  lock)
+    "$HOME/.local/bin/kona-menu-sound"
+    exec hyprlock
+    ;;
+  logout)
+    "$HOME/.local/bin/kona-confirm" 'Log out of Kona?' 'Log out' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    exec hyprctl dispatch 'hl.dsp.exit()'
+    ;;
+  reboot)
+    "$HOME/.local/bin/kona-confirm" 'Restart this computer?' 'Restart' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    exec systemctl reboot
+    ;;
+  poweroff)
+    "$HOME/.local/bin/kona-confirm" 'Shut down this computer?' 'Shut down' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    exec systemctl poweroff
+    ;;
+  hibernate)
+    "$HOME/.local/bin/kona-confirm" 'Hibernate this computer?' 'Hibernate' || exit 0
+    "$HOME/.local/bin/kona-menu-sound"
+    exec systemctl hibernate
+    ;;
+  *)
+    printf '%s\n' 'usage: kona-session-action {lock|logout|reboot|poweroff|hibernate|--check}' >&2
+    exit 2
+    ;;
+esac

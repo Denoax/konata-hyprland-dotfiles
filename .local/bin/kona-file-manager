@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+target="${1:-$HOME}"
+
+for manager in dolphin nautilus nemo thunar; do
+  if command -v "$manager" >/dev/null 2>&1; then
+    exec "$manager" "$target"
+  fi
+done
+
+if command -v flatpak >/dev/null 2>&1 && flatpak info org.kde.dolphin >/dev/null 2>&1; then
+  exec flatpak run org.kde.dolphin "$target"
+fi
+
+if command -v yazi >/dev/null 2>&1; then
+  exec kitty --class KonaFiles -e yazi "$target"
+fi
+
+notify-send -u critical "Files unavailable" \
+  "Install Dolphin, Nautilus, Nemo, Thunar, or Yazi."
+exit 1

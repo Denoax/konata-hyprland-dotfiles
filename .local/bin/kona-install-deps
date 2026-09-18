@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-packages=(swayosd satty wf-recorder hyprsunset quickshell fish)
+packages=(swayosd satty wf-recorder hyprsunset quickshell fish foot starship eza zoxide direnv translate-shell)
 cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/kona-user-packages"
 install_root="$HOME/.local/opt/kona-pkgs"
 mkdir -p "$cache_root" "$install_root"

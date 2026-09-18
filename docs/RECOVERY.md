@@ -28,10 +28,10 @@ The expected result is one canonical Hyprland instance and one active packaged p
 
 ```bash
 kona-appearance status
-kona-appearance light   # or dark
+kona-appearance light   # or kona / dark
 ```
 
-Appearance changes are transactional. A failed portal/toolkit/theme step restores the prior host preference, toolkit settings, generated fragments and durable intent. Do not edit `.config/kona/theme/current/` to repair a source token; fix `.config/kona/appearance/light.json` or `dark.json` and apply again.
+Appearance changes are transactional. A failed portal/toolkit/theme step restores the prior host preference, toolkit settings, generated fragments and durable intent. Do not edit `.config/kona/theme/current/` to repair a source token; fix the matching file in `.config/kona/appearance/` and apply again.
 
 ## Recover profiles and wallpaper
 
@@ -61,6 +61,8 @@ hyprctl reload config-only
 ```
 
 Restart only the affected service. Do not restart the compositor, notification server or unrelated applications to mask a component failure.
+
+Kona masks the packaged `swaync.service` because its D-Bus activation can race the selected notification owner even when the unit is disabled. A deliberate rollback to SwayNC must first restore its backed-up config and then run `systemctl --user unmask swaync.service`; never run both notification servers together.
 
 ## Validate an isolated restore
 

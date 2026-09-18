@@ -39,6 +39,10 @@ ShellRoot {
         const state = toplevel && toplevel.lastIpcObject ? toplevel.lastIpcObject : {};
         return String(state.class || state.initialClass || "");
     }
+    function appIcon(name) {
+        const resolved = String(Quickshell.iconPath(String(name || ""), true));
+        return resolved && !resolved.includes("image-missing") ? resolved : "";
+    }
     function entryMatches(entry, toplevel) {
         const windowClass = normalizedAppName(classFor(toplevel));
         if (!windowClass) return false;
@@ -66,7 +70,7 @@ ShellRoot {
         return selected.slice(0, 5).map(app => {
             const windows = toplevels.filter(toplevel => root.entryMatches(app, toplevel));
             const target = windows.find(toplevel => toplevel.address === root.activeAddress) || windows[0] || null;
-            return {desktopId: app.id, name: app.name, icon: Quickshell.iconPath(app.icon),
+            return {desktopId: app.id, name: app.name, icon: root.appIcon(app.icon),
                 running: windows.length > 0, active: windows.some(toplevel => toplevel.address === root.activeAddress),
                 address: target ? target.address : "", windowCount: windows.length};
         });
@@ -79,11 +83,11 @@ ShellRoot {
         for (const toplevel of Hyprland.toplevels.values) {
             const windowClass = root.classFor(toplevel);
             const key = root.normalizedAppName(windowClass);
-            if (!key || ["quickshell", "rofi", "waybar", "swaync"].includes(key)) continue;
+            if (!key || ["quickshell", "rofi", "waybar"].includes(key)) continue;
             let item = grouped[key];
             if (!item) {
                 const entry = DesktopEntries.heuristicLookup(windowClass) || available.find(app => root.entryMatches(app, toplevel));
-                item = {name: entry ? entry.name : windowClass, icon: Quickshell.iconPath(entry ? entry.icon : windowClass),
+                item = {name: entry ? entry.name : windowClass, icon: root.appIcon(entry ? entry.icon : windowClass),
                     address: toplevel.address, active: toplevel.address === root.activeAddress, windowCount: 1};
                 grouped[key] = item;
                 ordered.push(item);
@@ -177,25 +181,28 @@ ShellRoot {
         const home = Quickshell.env("HOME");
         const bin = home + "/.local/bin/";
         const actions = {
-            "music.open": [bin + "kona-music-popup"],
-            "weather.open": [bin + "kona-weather-popup"],
-            "applications.open": ["rofi", "-show", "drun", "-theme", home + "/.config/rofi/konata.rasi"],
+            "music.open": [bin + "kona-caelestia-dashboard", "media"],
+            "weather.open": [bin + "kona-caelestia-dashboard", "weather"],
+            "applications.open": [bin + "kona-end4-overview"],
             "windows.open": ["rofi", "-show", "window", "-theme", home + "/.config/rofi/window.rasi"],
-            "overview.open": [bin + "kona-overview"],
+            "overview.open": [bin + "kona-end4-overview"],
+            "assistant.open": [bin + "kona-end4-surface", "assistant"],
+            "files.open": [bin + "kona-file-manager"],
+            "cheatsheet.open": [bin + "kona-end4-surface", "cheatsheet"],
             "controls.open": [bin + "kona-quick-settings"],
-            "audio.open": [bin + "kona-audio-menu"],
+            "audio.open": [bin + "kona-caelestia-audio"],
             "network.open": ["nm-connection-editor"],
             "bluetooth.open": ["blueman-manager"],
             "night.toggle": [bin + "kona-night-light", "toggle"],
-            "notifications.open": [bin + "kona-dashboard", "--toggle"],
+            "notifications.open": [bin + "kona-end4-notifications", "toggle"],
             "clipboard.open": [bin + "kona-clipboard"],
             "screenshot.open": [bin + "kona-screenshot", "region-edit"],
             "wallpaper.open": [bin + "kona-wallpaper-menu"],
             "profiles.open": [bin + "kona-profile-menu"],
-            "settings.open": [bin + "kona-shell", "studio"],
-            "shortcuts.open": [bin + "kona-shell", "shortcuts"],
+            "settings.open": [bin + "kona-caelestia-settings"],
+            "shortcuts.open": [bin + "kona-end4-surface", "cheatsheet"],
             "record.open": [bin + "kona-quick-settings"],
-            "session.open": [bin + "kona-session-menu"]
+            "session.open": [bin + "kona-caelestia-session"]
         };
         if (actionId === "workspace.select" && payload && Number.isInteger(payload.id)) {
             const workspace = Hyprland.workspaces.values.find(value => value.id === payload.id);
@@ -217,7 +224,7 @@ ShellRoot {
             finishApplicationNavigation(); return;
         }
         if (actionId === "sidebar.hide") { visibility.hide(); releaseFocus(); return; }
-        if (["appearance.light", "appearance.dark", "appearance.toggle"].includes(actionId)) {
+        if (["appearance.light", "appearance.kona", "appearance.dark", "appearance.toggle"].includes(actionId)) {
             Quickshell.execDetached([bin + "kona-appearance", actionId.split(".")[1]]);
             releaseFocus();
             return;

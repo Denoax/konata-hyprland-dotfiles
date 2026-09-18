@@ -99,20 +99,15 @@ class WeatherTests(unittest.TestCase):
         self.assertNotIn("while True", source)
         self.assertEqual(weather.DEFAULT_TTL, 1800)
 
-    def test_native_surface_and_sidebar_use_one_shot_owner(self):
-        shell = (ROOT / ".config/quickshell/kona/weather/shell.qml").read_text()
-        view = (ROOT / ".config/quickshell/kona/weather/WeatherPopupView.qml").read_text()
+    def test_sidebar_summary_and_caelestia_surface_share_configured_location(self):
         sidebar = (ROOT / ".config/quickshell/kona/sidebar/qml/SidebarView.qml").read_text()
-        owner = (ROOT / ".local/bin/kona-weather-popup").read_text()
-        self.assertIn('target:"weather"', shell)
-        self.assertIn('kona-weather", force ? "refresh" : "status"', shell)
-        self.assertIn('Precipitation Chance', view)
-        self.assertIn('property var weatherData:', view)
-        self.assertNotIn('property var data:', view)
-        self.assertIn('model: (root.weatherData.hourly || []).slice(0, 6)', view)
+        sidebar_shell = (ROOT / ".config/quickshell/kona/sidebar/shell.qml").read_text()
+        dashboard = (ROOT / ".local/bin/kona-caelestia-dashboard").read_text()
         self.assertIn('WeatherCompact {', sidebar)
-        self.assertIn('weather.open', sidebar)
-        self.assertIn('weather-popup.lock', owner)
+        self.assertIn('"weather.open": [bin + "kona-caelestia-dashboard", "weather"]', sidebar_shell)
+        self.assertIn('config_path = config_home / "kona/weather.json"', dashboard)
+        self.assertIn('KONA_WEATHER_DISABLE_IP', dashboard)
+        self.assertFalse((ROOT / ".local/bin/kona-weather-popup").exists())
 
 
 if __name__ == "__main__":

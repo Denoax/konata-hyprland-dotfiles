@@ -1,6 +1,0 @@
-{
-  "source_size": [1122, 1402],
-  "crop": {"x": 80, "y": 84, "width": 960, "height": 1248},
-  "outputs": ["shell/weather_shell_light_visible.png", "shell/weather_shell_dark_visible.png"],
-  "reason": "Remove transparent canvas margins so runtime layout and input bounds match the visible card."
-}

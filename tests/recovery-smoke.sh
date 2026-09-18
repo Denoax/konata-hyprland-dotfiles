@@ -17,6 +17,9 @@ dry_output="$(HOME="$dry_home" XDG_CONFIG_HOME="$dry_home/.config" \
 mkdir -p "$test_home/.config/systemd/user"
 printf 'unrelated user service\n' > "$test_home/.config/systemd/user/unrelated.service"
 printf 'old Kona unit\n' > "$test_home/.config/systemd/user/kona-automount.service"
+mkdir -p "$test_home/.config/quickshell/kona/weather" "$test_home/.local/bin"
+printf 'obsolete weather surface\n' > "$test_home/.config/quickshell/kona/weather/shell.qml"
+printf 'obsolete weather launcher\n' > "$test_home/.local/bin/kona-weather-popup"
 
 HOME="$test_home" \
 XDG_CONFIG_HOME="$test_home/.config" \
@@ -34,6 +37,7 @@ required=(
   '.local/bin/kona-motion'
   '.local/bin/kona-appearance'
   '.config/kona/appearance/light.json'
+  '.config/kona/appearance/kona.json'
   '.config/kona/appearance/dark.json'
   '.config/kona/motion.json'
   '.config/quickshell/kona/shell.qml'
@@ -47,14 +51,16 @@ required=(
   '.local/bin/kona-arch-system-shell'
   '.local/bin/kona-scratch-shell'
   '.local/bin/kona-terminal'
+  '.local/bin/kona-caelestia-settings'
+  '.local/bin/kona-end4-notifications'
+  '.local/bin/kona-wallpaper-select'
   '.local/bin/kona-weather'
-  '.local/bin/kona-weather-popup'
   '.config/btop/kona-arch.conf'
   '.config/cava/kona-arch.conf'
   '.config/fastfetch/kona-arch.jsonc'
   '.config/fastfetch/assets/kona-thumbs-up.png'
-  '.config/quickshell/kona/weather/shell.qml'
-  '.config/quickshell/kona/weather/WeatherPopupView.qml'
+  '.config/foot/foot.ini'
+  '.config/starship.toml'
   '.config/kona/weather.example.json'
   '.config/rofi/shared.rasi'
   '.config/rofi/konata.rasi'
@@ -76,10 +82,10 @@ required=(
   '.config/kona/theme/current/tokens.json'
   '.config/kona/theme/current/appearance.json'
   '.config/kona/theme/current/waybar.css'
-  '.config/kona/theme/current/swaync.css'
   '.config/kona/theme/current/swayosd.css'
   '.config/kona/theme/current/rofi.rasi'
   '.config/kona/theme/current/kitty.conf'
+  '.config/kona/theme/current/foot.ini'
   '.config/kona/theme/current/hyprland.colors'
   '.local/bin/kona-runtime-health'
   '.config/kona/wallpapers/konata-mono-rain/render/konata-mono-rain.gif'
@@ -90,7 +96,7 @@ for relative in "${required[@]}"; do
   [[ -s "$test_home/$relative" ]] || { printf 'missing restored file: %s\n' "$relative" >&2; exit 1; }
 done
 [[ -x "$test_home/.local/bin/kona-backup" ]]
-for command in kona-workspace-capture kona-waybar-refresh kona-state kona-theme kona-appearance kona-wallpaper-menu kona-wallpaper-engine kona-profile kona-profile-menu kona-runtime-start kona-arch-workspace kona-arch-system-shell kona-scratch-shell kona-terminal kona-weather kona-weather-popup; do
+for command in kona-workspace-capture kona-waybar-refresh kona-state kona-theme kona-appearance kona-wallpaper-menu kona-wallpaper-engine kona-wallpaper-select kona-profile kona-profile-menu kona-runtime-start kona-arch-workspace kona-arch-system-shell kona-scratch-shell kona-terminal kona-weather kona-caelestia-settings kona-end4-notifications; do
   [[ -x "$test_home/.local/bin/$command" ]]
   cmp -s "$repo_root/.local/bin/$command" "$test_home/.local/bin/$command"
 done
@@ -105,6 +111,13 @@ cmp -s "$repo_root/.config/hypr/hyprland.lua" "$test_home/.config/hypr/hyprland.
 [[ ! -e "$test_home/.local/bin/nwg-dock-hyprland-kona" ]]
 [[ ! -e "$test_home/.config/nwg-dock-hyprland" ]]
 [[ ! -e "$test_home/.config/nwg-drawer" ]]
+[[ ! -e "$test_home/.config/quickshell/kona/weather" ]]
+[[ ! -e "$test_home/.local/bin/kona-weather-popup" ]]
+[[ ! -e "$test_home/.config/swaync" ]]
+[[ ! -e "$test_home/.config/systemd/user/swaync.service.d" ]]
+[[ -L "$test_home/.config/systemd/user/swaync.service" ]]
+[[ "$(readlink "$test_home/.config/systemd/user/swaync.service")" == /dev/null ]]
+[[ ! -e "$test_home/.local/bin/kona-dashboard" ]]
 
 HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" \
   "$test_home/.local/bin/kona-theme" --default --no-reload >/dev/null

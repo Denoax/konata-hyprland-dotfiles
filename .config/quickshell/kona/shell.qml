@@ -109,9 +109,6 @@ ShellRoot {
     Process { command: [root.helper,"events"]; running: root.opened
         stdout: SplitParser { onRead: data => { if (data.includes("preferences.json") || data.includes("current")) root.refresh(); else root.updateStatus(); } }
     }
-    Process { command: ["swaync-client","-swb"]; running: root.opened
-        stdout: SplitParser { onRead: data => root.updateStatus() }
-    }
     Process { command: ["nmcli","monitor"]; running: root.opened
         stdout: SplitParser { onRead: data => root.updateStatus() }
     }
@@ -161,7 +158,17 @@ ShellRoot {
                             KText { text: root.isDeck ? "Apps, music and current state" : "Appearance and desktop preferences"; color: Appearance.textSecondary; font.pixelSize: 11 }
                         }
                         Item { Layout.fillWidth: true }
-                        KButton { motion: root.motionMode==="off" ? 0 : (root.data.motion["effect.fast"] || 140); text: root.isDeck ? "Settings" : "Desktop"; accent: root.accent; onClicked: root.navigate(root.isDeck ? "studio" : "deck") }
+                        KButton {
+                            motion: root.motionMode==="off" ? 0 : (root.data.motion["effect.fast"] || 140)
+                            text: root.isDeck ? "Settings" : "Desktop"
+                            accent: root.accent
+                            onClicked: {
+                                if (root.isDeck) {
+                                    Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/kona-caelestia-settings"]);
+                                    root.close();
+                                } else root.navigate("deck");
+                            }
+                        }
                         KButton { motion: root.motionMode==="off" ? 0 : (root.data.motion["effect.fast"] || 140); text: "Esc  ×"; onClicked: root.close(); implicitWidth: 86 }
                     }
                     Rectangle { Layout.fillWidth: true; height: 1; color: Appearance.outline }

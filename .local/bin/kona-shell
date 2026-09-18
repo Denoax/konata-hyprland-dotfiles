@@ -13,10 +13,14 @@ import time
 home=Path.home()
 page=sys.argv[1] if len(sys.argv)>1 else 'deck'
 if page not in ('deck','studio','wallpapers','shortcuts','mosaic','close'):sys.exit('Unknown Kona surface')
+if page == 'studio':
+    os.execv(str(home/'.local/bin/kona-caelestia-settings'), ['kona-caelestia-settings'])
+if page == 'shortcuts':
+    os.execv(str(home/'.local/bin/kona-end4-surface'), ['kona-end4-surface', 'cheatsheet'])
 config=Path(os.environ.get('KONA_SHELL_CONFIG',home/'.config/quickshell/kona'))
 packages=(home/'.local/opt/kona-pkgs/quickshell/usr',home/'.local/opt/kona-pkgs/quickshell-0.3.1/usr')
 pkg=next((path for path in packages if (path/'bin/quickshell').is_file()),packages[0])
-exe=shutil.which('quickshell') or str(pkg/'bin/quickshell')
+exe=str(pkg/'bin/quickshell') if (pkg/'bin/quickshell').is_file() else shutil.which('quickshell')
 if not Path(exe).is_file():
     fallback='kona-wallpaper-menu' if page=='wallpapers' else 'kona-quick-settings'
     subprocess.run(['notify-send','Kona','Optional Quickshell is unavailable; opening the Rofi fallback.'])

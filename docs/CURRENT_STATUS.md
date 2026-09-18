@@ -2,9 +2,9 @@
 
 Release checkpoint: **Kona Desktop V3 — 2026.09.17**
 
-V3 is the current public-main candidate. The installed product and repository include the auto-hiding Quickshell sidebar, Arch terminal workspace, modern Kitty/Fish terminal flows, MPRIS music popup, cached Open-Meteo Weather surface, Wallpaper Engine Workshop adapter, four profiles/scenes, system Light/Dark propagation, unified menus, SwayNC/SwayOSD integration, current-wallpaper Hyprlock continuity and event-driven session state.
+V3 is the current public-main candidate. The installed product and repository include the auto-hiding Quickshell sidebar, Arch terminal workspace, modern Foot/Fish terminal flows, MPRIS media dashboard, cached Open-Meteo Weather dashboard, Wallpaper Engine Workshop adapter, four profiles/scenes, transactional Light/Kona/Dark appearance propagation, Caelestia/end-4 menu integration, a single end-4 notification owner, SwayOSD integration, current-wallpaper Hyprlock continuity and event-driven session state.
 
-The release showcase under `showcase/assets/v3/` was captured from the real compositor on empty workspaces. Capture-time public demo data was removed afterward; the user's appearance, Weather configuration/cache, workspaces, focus, audio level and profile were restored. No private application window, notification history, network identity, local IP, username or home path is present in the published media.
+The runtime media under `showcase/assets/v3/` was captured from the real compositor on empty workspaces; the repository banner is a clearly decorative illustration rather than runtime evidence. Capture-time public demo data was removed afterward; the user's appearance, Weather configuration/cache, workspaces, focus, audio level and profile were restored. No private application window, notification history, network identity, local IP, username or home path is present in the published media.
 
 ## Validation boundary
 

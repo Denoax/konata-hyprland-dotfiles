@@ -53,18 +53,18 @@ launch() {
 }
 
 case "$choice" in
-  'Control Center') ~/.local/bin/kona-dashboard ;;
-  'Kona Settings') ~/.local/bin/kona-shell studio ;;
-  'Shortcut Help') ~/.local/bin/kona-shell shortcuts ;;
+  'Control Center') ~/.local/bin/kona-end4-notifications toggle ;;
+  'Kona Settings') ~/.local/bin/kona-caelestia-settings ;;
+  'Shortcut Help') ~/.local/bin/kona-end4-surface cheatsheet ;;
   'System Settings') launch systemsettings ;;
   'Display Settings') launch systemsettings kcm_kscreen ;;
   'Network') ~/.local/bin/kona-network-menu ;;
   'Bluetooth') ~/.local/bin/kona-bluetooth-menu ;;
   'Sound Settings') launch systemsettings kcm_pulseaudio ;;
-  'Audio Devices') ~/.local/bin/kona-audio-menu ;;
+  'Audio Devices') ~/.local/bin/kona-caelestia-audio ;;
   'Mouse Settings') launch systemsettings kcm_mouse ;;
   'Appearance') launch nwg-look ;;
-  'Workspace Overview') ~/.local/bin/kona-overview ;;
+  'Workspace Overview') ~/.local/bin/kona-end4-overview ;;
   'Quick Settings') ~/.local/bin/kona-quick-settings ;;
   'Updates') ~/.local/bin/kona-updates ;;
   'Night Light') ~/.local/bin/kona-night-light toggle && ~/.local/bin/kona-menu-sound ;;
@@ -73,7 +73,7 @@ case "$choice" in
   'Wallpapers') ~/.local/bin/kona-wallpaper-menu ;;
   'Restore Wallpaper') ~/.local/bin/kona-wallpaper simple ;;
   'Files') launch xdg-open "$HOME" ;;
-  'Terminal') launch kitty ;;
+  'Terminal') ~/.local/bin/kona-terminal ;;
   'Lock PC') launch hyprlock ;;
-  'Power / Session') ~/.local/bin/kona-session-menu ;;
+  'Power / Session') ~/.local/bin/kona-caelestia-session ;;
 esac

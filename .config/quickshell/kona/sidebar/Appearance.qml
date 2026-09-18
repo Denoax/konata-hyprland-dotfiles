@@ -46,7 +46,7 @@ QtObject {
             "text_muted", "accent", "accent_hover", "accent_pressed", "accent_soft",
             "outline", "outline_strong", "focus", "danger", "warning", "success",
             "shadow", "glow", "scrim"];
-        if (!value || !["light", "dark"].includes(value.mode)
+        if (!value || !["light", "kona", "dark"].includes(value.mode)
                 || required.some(key => typeof value[key] !== "string"))
             throw new Error("invalid semantic appearance palette");
         root.palette = value;

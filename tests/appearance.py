@@ -90,12 +90,14 @@ print('Applied '+sys.argv[-1])
         value = json.loads(result.stdout)
         self.assertEqual(value["mode"], mode)
         self.assertTrue(value["synchronized"])
-        self.assertEqual(value["portal"], 2 if mode == "light" else 1)
-        self.assertEqual(value["qt"], "BreezeLight" if mode == "light" else "BreezeDark")
+        system_mode = "dark" if mode in ("kona", "dark") else "light"
+        self.assertEqual(value["system_mode"], system_mode)
+        self.assertEqual(value["portal"], 1 if system_mode == "dark" else 2)
+        self.assertEqual(value["qt"], "BreezeDark" if system_mode == "dark" else "BreezeLight")
         self.assertEqual(value["theme"], mode)
         published = json.loads((self.home / ".config/kona/appearance/current.json").read_text())
         self.assertEqual(published["mode"], mode)
-        expected = "false" if mode == "light" else "true"
+        expected = "true" if system_mode == "dark" else "false"
         for version in ("3.0", "4.0"):
             source = (self.home / f".config/gtk-{version}/settings.ini").read_text()
             self.assertIn("gtk-application-prefer-dark-theme=" + expected, source)
@@ -114,6 +116,14 @@ print('Applied '+sys.argv[-1])
         self.assert_mode("dark")
         state = json.loads((self.home / ".local/state/kona/appearance.json").read_text())
         self.assertEqual(state, {"schema": 1, "mode": "dark", "source": "manual"})
+
+    def test_kona_mode_keeps_distinct_palette_and_publishes_dark_system_preference(self):
+        result = self.call("kona")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_mode("kona")
+        appearance = json.loads((self.home / ".config/kona/appearance/current.json").read_text())
+        self.assertEqual(appearance["surface"], "#B8CCE8")
+        self.assertEqual(self.system.read_text(), "prefer-dark")
 
     def test_portal_failure_rolls_back_system_toolkits_theme_and_state(self):
         self.assertEqual(self.call("dark").returncode, 0)

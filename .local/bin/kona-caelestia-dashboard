@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Launch the real Caelestia dashboard as a transient Kona surface."""
+
+from __future__ import annotations
+
+import hashlib
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+SOURCE = Path("/etc/xdg/quickshell/caelestia")
+TABS = {"dashboard": 0, "media": 1, "performance": 2, "weather": 3}
+
+
+def overlay_root() -> Path:
+    configured = os.environ.get("KONA_CAELESTIA_OVERLAY")
+    return Path(configured) if configured else Path.home() / ".config/quickshell/kona-caelestia"
+
+
+def runtime_root() -> Path:
+    return Path.home() / ".cache/kona/caelestia-dashboard"
+
+
+def fingerprint() -> str:
+    digest = hashlib.sha256()
+    for path in (
+        SOURCE / "shell.qml",
+        SOURCE / "services/Weather.qml",
+        SOURCE / "LICENSE",
+        overlay_root() / "shell.qml",
+        overlay_root() / "KonaDashboardWindow.qml",
+    ):
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def stage_runtime() -> Path:
+    if not SOURCE.is_dir():
+        raise RuntimeError("caelestia-shell is not installed (expected /etc/xdg/quickshell/caelestia)")
+    overlay = overlay_root()
+    if not overlay.is_dir():
+        raise RuntimeError(f"Kona Caelestia overlay is missing: {overlay}")
+
+    runtime = runtime_root()
+    marker = runtime / ".kona-source"
+    wanted = fingerprint()
+    current = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+    if current != wanted:
+        if runtime.exists():
+            shutil.rmtree(runtime)
+        shutil.copytree(SOURCE, runtime)
+        for name in ("shell.qml", "KonaDashboardWindow.qml"):
+            shutil.copy2(overlay / name, runtime / name)
+        weather_service = runtime / "services/Weather.qml"
+        weather_source = weather_service.read_text(encoding="utf-8")
+        ip_fallback = "} else if ((!loc || timer.elapsed() > 900) && !ipApiRequestPending && Date.now() >= ipApiBlockedUntil) {"
+        guarded_fallback = "} else if (!Quickshell.env(\"KONA_WEATHER_DISABLE_IP\") && (!loc || timer.elapsed() > 900) && !ipApiRequestPending && Date.now() >= ipApiBlockedUntil) {"
+        if ip_fallback not in weather_source:
+            raise RuntimeError("installed Caelestia Weather service no longer matches the supported privacy patch")
+        weather_service.write_text(weather_source.replace(ip_fallback, guarded_fallback, 1), encoding="utf-8")
+        marker.write_text(wanted + "\n", encoding="utf-8")
+    return runtime
+
+
+def quickshell() -> str:
+    executable = shutil.which("quickshell")
+    if not executable:
+        raise RuntimeError("system quickshell is missing; install caelestia-shell")
+    return executable
+
+
+def weather_environment(environment: dict[str, str], *, required: bool) -> None:
+    """Expose Kona's configured location to Caelestia without a second state store."""
+    environment["KONA_WEATHER_DISABLE_IP"] = "1"
+    config_home = Path(environment.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    config_path = config_home / "kona/weather.json"
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        latitude = float(config["latitude"])
+        longitude = float(config["longitude"])
+        if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+            raise ValueError("coordinates are outside their valid range")
+        units = config.get("units", "metric")
+        if units not in ("metric", "imperial"):
+            raise ValueError("units must be metric or imperial")
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+        if required:
+            raise RuntimeError(f"invalid Kona weather configuration at {config_path}: {error}") from error
+        return
+
+    environment["KONA_WEATHER_LOCATION"] = f"{latitude},{longitude}"
+    environment["KONA_WEATHER_UNITS"] = units
+
+
+def call_existing(executable: str, runtime: Path, action: str) -> bool:
+    method = ["toggle"] if action == "toggle" else ["tab", str(TABS[action])]
+    result = subprocess.run(
+        [executable, "ipc", "-p", str(runtime), "call", "konaDashboard", *method],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def is_ready(executable: str, runtime: Path, environment: dict[str, str]) -> bool:
+    result = subprocess.run(
+        [executable, "ipc", "-p", str(runtime), "call", "konaDashboard", "status"],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def main() -> int:
+    try:
+        action = sys.argv[1] if len(sys.argv) > 1 else "toggle"
+        if action not in ("toggle", *TABS) or len(sys.argv) > 2:
+            raise RuntimeError("usage: kona-caelestia-dashboard [toggle|dashboard|media|performance|weather]")
+        lock_path = runtime_root().with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            runtime = stage_runtime()
+            executable = quickshell()
+            environment = os.environ.copy()
+            environment["KONA_CAELESTIA_TAB"] = str(TABS.get(action, 0))
+            weather_environment(environment, required=action == "weather")
+            if call_existing(executable, runtime, action):
+                if action == "toggle":
+                    for _ in range(60):
+                        if not is_ready(executable, runtime, environment):
+                            return 0
+                        time.sleep(0.05)
+                    raise RuntimeError("Caelestia dashboard did not close")
+                return 0
+            theme_helper = Path(os.environ.get("KONA_UPSTREAM_THEME", Path(__file__).with_name("kona-upstream-theme")))
+            subprocess.run([str(theme_helper)], check=True)
+            child = subprocess.Popen(
+                [executable, "-n", "-p", str(runtime), "--no-color"],
+                env=environment,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=(Path.home() / ".local/state/kona/caelestia-dashboard.log").open("ab"),
+            )
+            for _ in range(60):
+                if is_ready(executable, runtime, environment):
+                    return 0
+                if child.poll() is not None:
+                    raise RuntimeError("Caelestia dashboard exited before becoming ready")
+                time.sleep(0.05)
+            raise RuntimeError("Caelestia dashboard did not become ready")
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"kona-caelestia-dashboard: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

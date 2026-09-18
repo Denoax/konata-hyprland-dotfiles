@@ -2,7 +2,7 @@
 Type=Application
 Name=Kona Settings
 Comment=Kona desktop settings
-Exec=kona-shell studio
+Exec=kona-caelestia-settings
 Icon=preferences-desktop
 Terminal=false
 Categories=Settings;Utility;

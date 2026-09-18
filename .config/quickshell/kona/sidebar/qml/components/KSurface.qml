@@ -6,6 +6,7 @@ Item {
     property bool glow: false
     property bool frostedEdge: false
     property bool highlighted: false
+    property bool outlined: true
     property real surfaceOpacity: 0.95
     BorderImage {
         anchors.fill: parent
@@ -35,11 +36,8 @@ Item {
         topLeftRadius: root.frostedEdge ? 0 : root.radius
         bottomLeftRadius: root.frostedEdge ? 0 : root.radius
         opacity: root.surfaceOpacity
-        gradient: Gradient {
-            GradientStop { position: 0; color: root.highlighted ? Tokens.surfaceRaised : Tokens.panel }
-            GradientStop { position: 1; color: root.highlighted ? Tokens.active : Tokens.surface }
-        }
-        border.width: 1
+        color: root.highlighted ? Tokens.surfaceRaised : Tokens.panel
+        border.width: root.outlined ? 1 : 0
         border.color: root.focused ? Tokens.accent : Tokens.line
     }
 }

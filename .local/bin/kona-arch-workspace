@@ -219,6 +219,13 @@ def required_commands() -> list[str]:
     return missing
 
 
+def foot_binary() -> str:
+    local = Path.home() / ".local/opt/kona-pkgs/foot/usr/bin/foot"
+    if local.is_file() and os.access(local, os.X_OK):
+        return str(local)
+    return "foot"
+
+
 def component_commands(theme_directory: Path) -> list[tuple[str, list[str]]]:
     home = Path.home()
     config = Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config")))
@@ -389,14 +396,7 @@ def toggle_scratch(instance: dict[str, object]) -> None:
     environment = session_environment(instance)
     process = subprocess.Popen(
         [
-            "kitty", "--class", SCRATCH_CLASS, "--title", "scratch — fish",
-            "--override", "remember_window_size=no",
-            "--override", "font_size=13",
-            "--override", "window_padding_width=26",
-            "--override", "background_opacity=0.92",
-            "--override", "cursor_shape=beam",
-            "--override", "cursor_blink_interval=0.6",
-            "--override", "tab_bar_style=hidden",
+            foot_binary(), f"--app-id={SCRATCH_CLASS}", "--title=Kona Scratch",
             str(Path.home() / ".local/bin/kona-scratch-shell"),
         ],
         env=environment,

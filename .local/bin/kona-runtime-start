@@ -13,7 +13,7 @@ if uwsm check is-active hyprland.desktop; then
   # Keep Waybar's accepted restart semantics: an independent graphical scope,
   # not automatic respawn that could unhide the bar during focus/gaming.
   uwsm app -s s -t scope -u kona-waybar -- waybar &
-  systemctl --user start hypridle.service swaync.service \
+  systemctl --user start hypridle.service kona-notifications.service \
     kona-clipboard@text.service kona-clipboard@image.service \
     kona-automount.service kona-osd.service
   # NetworkManager and Blueman already have XDG autostart entries. UWSM owns
@@ -23,6 +23,7 @@ else
   hypridle &
   waybar &
   # Preserve independent launches if one component fails.
+  "$HOME/.local/bin/kona-end4-notifications" run &
   nm-applet --indicator &
   blueman-applet &
   udiskie --tray &
@@ -55,7 +56,7 @@ else
   fi
 fi
 
-# Reconcile the durable Light/Dark intent once per compositor start. The command exits;
+# Reconcile the durable Light/Kona/Dark intent once per compositor start. The command exits;
 # it does not add a watcher or a second session owner.
 "$HOME/.local/bin/kona-appearance" reconcile >/dev/null ||
   printf 'Kona: appearance reconciliation failed; preserved previous system state.\n' >&2

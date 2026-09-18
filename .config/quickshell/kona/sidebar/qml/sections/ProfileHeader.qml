@@ -7,6 +7,7 @@ Item {
     property url avatar: ""
     implicitWidth: 278
     implicitHeight: content.implicitHeight + 24
+    KSurface { anchors.fill: parent; radius: 16; highlighted: true; outlined: false; surfaceOpacity: 0.82 }
     Column {
         id: content
         x: 12; y: 12; width: parent.width - 24; spacing: 14

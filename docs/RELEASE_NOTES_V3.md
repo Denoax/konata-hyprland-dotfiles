@@ -5,14 +5,14 @@ V3 moves Kona from a themed desktop checkpoint to an Arch-first Hyprland worksta
 ## Highlights
 
 - `Super + Shift + D` opens a native `special:arch` composition with Btop, Fastfetch and CAVA; closing it releases every child.
-- Kitty/Fish terminal and scratch workflows share Kona semantic colors and history-based command autosuggestions.
+- Foot/Fish/Starship terminal and scratch workflows share Kona semantic colors and history-based command autosuggestions; the Arch system terminal retains Kitty image support.
 - The auto-hiding Quickshell sidebar replaces the retired dock and centralizes navigation without duplicating backend state.
 - One Light/Dark command coordinates Kona surfaces, XDG portal preference, GTK and Qt.
 - Weather uses explicit-location Open-Meteo data with bounded caching and no resident poller.
 - The music popup keeps MPRIS/PipeWire ownership and one transient CAVA lifecycle.
 - Wallpaper Engine Workshop items integrate with the existing profile policy and preserve static Focus/Gaming behavior.
 - Hyprlock uses the current Kona backdrop and shared avatar while PAM remains the only authentication owner.
-- Rofi, SwayNC and SwayOSD share semantic tokens, focus treatment, motion and sound feedback.
+- Rofi, Quickshell notification surfaces and SwayOSD share Kona's semantic appearance and interaction language.
 
 ## Runtime and recovery
 

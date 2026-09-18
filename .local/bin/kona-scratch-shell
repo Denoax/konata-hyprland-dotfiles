@@ -62,6 +62,35 @@ set -g fish_pager_color_prefix {palette["accent"]} --bold
 set -g fish_pager_color_completion {palette["secondary"]}
 set -g fish_pager_color_description {palette["muted"]} --dim
 
+if command -q direnv
+    direnv hook fish | source
+end
+if command -q zoxide
+    zoxide init fish --cmd cd | source
+end
+if command -q eza
+    alias ls='eza --icons --group-directories-first -1'
+end
+
+abbr --add lg lazygit
+abbr --add gd 'git diff'
+abbr --add ga 'git add .'
+abbr --add gc 'git commit -am'
+abbr --add gl 'git log'
+abbr --add gs 'git status'
+abbr --add gst 'git stash'
+abbr --add gsp 'git stash pop'
+abbr --add gp 'git push'
+abbr --add gpl 'git pull'
+abbr --add gsw 'git switch'
+abbr --add gsm 'git switch main'
+abbr --add gb 'git branch'
+abbr --add gbd 'git branch -d'
+abbr --add l ls
+abbr --add ll 'ls -l'
+abbr --add la 'ls -a'
+abbr --add lla 'ls -la'
+
 function fish_mode_prompt
 end
 
@@ -69,31 +98,40 @@ function fish_title
     printf '{title} · %s' (prompt_pwd --full-length-dirs 2)
 end
 
-function fish_prompt
-    set -l previous_status $status
-    printf '\n'
-    set_color {palette["accent"]} --bold
-    printf '╭─'
-    set_color {palette["muted"]}
-    printf ' {label} '
-    set_color {palette["accent"]}
-    printf 'in '
-    set_color {palette["text"]} --bold
-    printf '%s' (prompt_pwd --full-length-dirs 2)
-    if test $previous_status -ne 0
-        set_color {palette["danger"]}
-        printf '  [%s]' $previous_status
+if command -q starship
+    set -gx STARSHIP_CONFIG {Path.home() / ".config/starship.toml"}
+    starship init fish | source
+else
+    function fish_prompt
+        set -l previous_status $status
+        printf '\n'
+        set_color {palette["accent"]} --bold
+        printf '╭─'
+        set_color {palette["muted"]}
+        printf ' {label} '
+        set_color {palette["accent"]}
+        printf 'in '
+        set_color {palette["text"]} --bold
+        printf '%s' (prompt_pwd --full-length-dirs 2)
+        if test $previous_status -ne 0
+            set_color {palette["danger"]}
+            printf '  [%s]' $previous_status
+        end
+        printf '\n'
+        set_color {palette["accent"]} --bold
+        printf '╰─❯ '
+        set_color normal
     end
-    printf '\n'
-    set_color {palette["accent"]} --bold
-    printf '╰─❯ '
-    set_color normal
 end
 
 function fish_right_prompt
     set_color {palette["muted"]} --dim
     date '+%H:%M'
     set_color normal
+end
+
+function mark_prompt_start --on-event fish_prompt
+    echo -en '\\e]133;A\\e\\\\'
 end
 '''
 
@@ -115,7 +153,11 @@ def main() -> None:
     finally:
         Path(temporary).unlink(missing_ok=True)
     binary = fish_binary()
-    os.execve(binary, [str(binary), "--no-config", "--init-command", f'source "{destination}"'], os.environ.copy())
+    environment = os.environ.copy()
+    user_bins = [Path.home() / f".local/opt/kona-pkgs/{name}/usr/bin"
+                 for name in ("starship", "eza", "zoxide", "direnv")]
+    environment["PATH"] = ":".join(str(path) for path in user_bins) + ":" + environment.get("PATH", "")
+    os.execve(binary, [str(binary), "--no-config", "--init-command", f'source "{destination}"'], environment)
 
 
 if __name__ == "__main__":

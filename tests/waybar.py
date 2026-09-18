@@ -36,6 +36,9 @@ class WaybarContracts(unittest.TestCase):
                 self.assertIn(f'workspace = "{number}", monitor = "{bar["output"]}"', lua)
             self.assertTrue(bar['reload_style_on_change'])
             self.assertEqual(bar['height'] + bar['margin-top'], 38)
+            self.assertEqual(bar['margin-top'], 0)
+            self.assertEqual(bar['margin-left'], 0)
+            self.assertEqual(bar['margin-right'], 0)
             for side in ['left', 'center', 'right']:
                 for name in leaves(bar, bar['modules-' + side]):
                     owners.setdefault(name, []).append(bar['output'])
@@ -57,8 +60,8 @@ class WaybarContracts(unittest.TestCase):
             ('pulseaudio', 'on-click-right'): 'pavucontrol',
             ('custom/recording', 'on-click'): '~/.local/bin/kona-record output',
             ('custom/gaming', 'on-click'): '~/.local/bin/kona-game-mode toggle',
-            ('custom/notifications', 'on-click'): '~/.local/bin/kona-dashboard --toggle',
-            ('custom/notifications', 'on-click-right'): 'swaync-client -d -sw',
+            ('custom/notifications', 'on-click'): '~/.local/bin/kona-end4-notifications toggle',
+            ('custom/notifications', 'on-click-right'): '~/.local/bin/kona-end4-notifications dnd-toggle',
         }
         for (name, action), command in actions.items():
             self.assertEqual(modules[name][action], command)
@@ -68,8 +71,8 @@ class WaybarContracts(unittest.TestCase):
         self.assertEqual(modules['hyprland/window']['rewrite'][''], 'KONATA@ARCH')
         self.assertEqual(modules['hyprland/window']['max-length'], 42)
         hyprland = (ROOT / '.config/hypr/hyprland.lua').read_text()
-        self.assertIn('bindSuper("SPACE", hl.dsp.exec_cmd(launcher))', hyprland)
-        self.assertIn('local launcher = "rofi -show drun', hyprland)
+        self.assertIn('bindSuper("SPACE", hl.dsp.exec_cmd("~/.local/bin/kona-end4-overview")', hyprland)
+        self.assertNotIn('local launcher = "rofi -show drun', hyprland)
 
     def test_hardware_is_native_drawer_with_existing_cadence(self):
         right = next(b for b in BARS if b['output'] == 'HDMI-A-5')
@@ -93,6 +96,7 @@ class WaybarContracts(unittest.TestCase):
         outer = style.split('window#waybar > box {', 1)[1].split('}', 1)[0]
         self.assertIn('background: transparent;', outer)
         self.assertNotIn('box-shadow: 0', style)
+        self.assertIn('border-radius: 0 0 14px 0;', style)
 
 
 if __name__ == '__main__':

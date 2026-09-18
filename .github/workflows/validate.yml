@@ -42,12 +42,11 @@ jobs:
         run: |
           set -e
           for test in \
-            appearance.py arch-workspace.py control-center.py event-state.py \
+            appearance.py arch-workspace.py end4-notifications.py event-state.py \
             lockscreen.py mono-rain.py music-popup.py \
             profiles.py repository.py rofi-surfaces.py runtime.py sidebar-host.py \
             sidebar-navigation.py theme.py unified-menus.py v4.py \
-            wallpaper-engine.py wallpaper-theme.py waybar.py weather.py \
-            weather-popup.py
+            upstream-ui.py wallpaper-engine.py wallpaper-theme.py waybar.py weather.py
           do
             python3 "tests/$test"
           done

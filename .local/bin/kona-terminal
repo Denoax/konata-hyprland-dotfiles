@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec kitty \
-    --class KonaTerminal \
-    --title 'kona — terminal' \
-    --override remember_window_size=no \
-    --override font_size=12.5 \
-    --override window_padding_width=22 \
-    --override background_opacity=0.90 \
-    --override cursor_shape=beam \
-    --override cursor_blink_interval=0.6 \
-    --override tab_bar_style=hidden \
+foot="$HOME/.local/opt/kona-pkgs/foot/usr/bin/foot"
+if [[ ! -x "$foot" ]]; then
+    foot="$(command -v foot || true)"
+fi
+[[ -n "$foot" ]] || { printf 'Kona terminal: Foot is unavailable; run kona-install-deps.\n' >&2; exit 1; }
+
+exec "$foot" \
+    --app-id=KonaTerminal \
+    --title='Kona Terminal' \
     "$HOME/.local/bin/kona-scratch-shell" terminal

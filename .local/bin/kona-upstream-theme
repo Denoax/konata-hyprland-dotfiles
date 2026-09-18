@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Derive read-only upstream UI colour caches from Kona appearance state."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import re
+
+
+def luminance(value: str) -> float:
+    channels = [int(value[index:index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+              for channel in channels]
+    return sum(weight * channel for weight, channel in zip((0.2126, 0.7152, 0.0722), linear))
+
+
+def contrast(first: str, second: str) -> float:
+    bright, dark = sorted((luminance(first), luminance(second)), reverse=True)
+    return (bright + 0.05) / (dark + 0.05)
+
+
+def without_hash(value: str) -> str:
+    return value.removeprefix("#")
+
+
+def atomic_json(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def snake_case(value: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
+
+
+def main() -> int:
+    home = Path.home()
+    source = home / ".config/kona/appearance/current.json"
+    if not source.is_file():
+        source = home / ".config/kona/appearance/dark.json"
+
+    tokens = json.loads(source.read_text(encoding="utf-8"))
+    mode = str(tokens.get("mode", "dark"))
+    system_mode = "dark" if mode in ("kona", "dark") else "light"
+    dark = system_mode == "dark"
+
+    background = tokens["background"]
+    surface = tokens["surface"]
+    surface_alt = tokens["surface_alt"]
+    elevated = tokens["surface_elevated"]
+    pressed = tokens["surface_pressed"]
+    text = tokens["text"]
+    secondary = tokens["text_secondary"]
+    muted = tokens["text_muted"]
+    accent = tokens["accent"]
+    accent_soft = tokens["accent_soft"]
+    outline = tokens["outline"]
+    outline_strong = tokens["outline_strong"]
+    focus = tokens["focus"]
+    danger = tokens["danger"]
+    success = tokens["success"]
+    warning = tokens["warning"]
+    on_accent = max((text, background, "#000000", "#FFFFFF"),
+                    key=lambda colour: contrast(colour, accent))
+    inverse_surface = "#EDF4FF" if dark else "#172337"
+    inverse_text = "#253247" if dark else "#EFF5FF"
+
+    colours = {
+        "primary_paletteKeyColor": accent,
+        "secondary_paletteKeyColor": focus,
+        "tertiary_paletteKeyColor": secondary,
+        "neutral_paletteKeyColor": surface,
+        "neutral_variant_paletteKeyColor": surface_alt,
+        "background": background,
+        "onBackground": text,
+        "surface": background,
+        "surfaceDim": background,
+        "surfaceBright": elevated,
+        "surfaceContainerLowest": background,
+        "surfaceContainerLow": surface,
+        "surfaceContainer": surface_alt,
+        "surfaceContainerHigh": elevated,
+        "surfaceContainerHighest": pressed,
+        "onSurface": text,
+        "surfaceVariant": surface_alt,
+        "onSurfaceVariant": secondary,
+        "inverseSurface": inverse_surface,
+        "inverseOnSurface": inverse_text,
+        "outline": outline_strong,
+        "outlineVariant": outline,
+        "shadow": "#000000",
+        "scrim": "#000000",
+        "surfaceTint": accent,
+        "primary": accent,
+        "onPrimary": on_accent,
+        "primaryContainer": accent_soft,
+        "onPrimaryContainer": text,
+        "inversePrimary": focus,
+        "secondary": secondary,
+        "onSecondary": background,
+        "secondaryContainer": surface_alt,
+        "onSecondaryContainer": text,
+        "tertiary": focus,
+        "onTertiary": background,
+        "tertiaryContainer": elevated,
+        "onTertiaryContainer": text,
+        "error": danger,
+        "onError": background,
+        "errorContainer": danger,
+        "onErrorContainer": text,
+        "success": success,
+        "onSuccess": background,
+        "successContainer": success,
+        "onSuccessContainer": text,
+        "primaryFixed": accent_soft,
+        "primaryFixedDim": accent,
+        "onPrimaryFixed": background,
+        "onPrimaryFixedVariant": surface_alt,
+        "secondaryFixed": surface_alt,
+        "secondaryFixedDim": secondary,
+        "onSecondaryFixed": background,
+        "onSecondaryFixedVariant": surface,
+        "tertiaryFixed": elevated,
+        "tertiaryFixedDim": focus,
+        "onTertiaryFixed": background,
+        "onTertiaryFixedVariant": surface,
+        "term0": background,
+        "term1": danger,
+        "term2": success,
+        "term3": warning,
+        "term4": accent,
+        "term5": focus,
+        "term6": secondary,
+        "term7": text,
+        "term8": muted,
+        "term9": danger,
+        "term10": success,
+        "term11": warning,
+        "term12": accent,
+        "term13": focus,
+        "term14": secondary,
+        "term15": text,
+    }
+
+    result = {
+        "name": "Kona",
+        "flavour": "Konata blue",
+        "mode": system_mode,
+        "colours": {name: without_hash(value) for name, value in colours.items()},
+    }
+    atomic_json(home / ".local/state/caelestia/scheme.json", result)
+
+    end4_root = Path(os.environ.get(
+        "KONA_END4_STATE_HOME",
+        home / ".local/state/kona/end4-xdg/state",
+    ))
+    end4_colours = {
+        snake_case(name): value
+        for name, value in colours.items()
+        if not name.endswith("paletteKeyColor") and not name.startswith("term")
+    }
+    atomic_json(end4_root / "user/generated/colors.json", end4_colours)
+    # QStandardPaths may append the Quickshell application name to StateLocation.
+    atomic_json(end4_root / "quickshell/user/generated/colors.json", end4_colours)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

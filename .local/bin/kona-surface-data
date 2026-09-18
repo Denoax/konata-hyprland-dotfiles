@@ -55,8 +55,8 @@ def metrics():
 def status():
     state=json.loads(run([BIN/'kona-state']))
     state['metrics']=metrics()
-    try: state['notifications']=int(run(['swaync-client','-c'],5))
-    except (ValueError,RuntimeError,subprocess.SubprocessError):state['notifications']=None
+    try: state['notifications']=json.loads(run([BIN/'kona-end4-notifications','status'],5))['count']
+    except (ValueError,KeyError,RuntimeError,subprocess.SubprocessError,json.JSONDecodeError):state['notifications']=None
     try: state['network']=run(['nmcli','-t','-f','NAME','connection','show','--active'],5).splitlines()[0]
     except (IndexError,RuntimeError,subprocess.SubprocessError):state['network']='Offline'
     state['mosaic']=(Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))/'kona/mosaic-return.json').exists()
@@ -85,7 +85,6 @@ def shortcuts():
             if cmd.startswith('~/.local/bin/kona-'):label=cmd.removeprefix('~/.local/bin/kona-').replace('-',' ').capitalize()
             elif 'rofi -show window' in cmd:label='Window switcher'
             elif 'rofi -show run' in cmd:label='Run a command'
-            elif cmd.startswith('swaync-client'):label='Toggle Control Center'
             elif cmd=='hyprlock':label='Lock desktop'
             else:label='Open '+cmd
         elif variable:label=aliases.get(variable.group(1),variables.get(variable.group(1),variable.group(1)))
@@ -126,7 +125,7 @@ def catalog():
 
 def snapshot():
     versions={}
-    for name,cmd in {'Hyprland':['hyprctl','version'],'Matugen':['matugen','--version'],'Waybar':['waybar','--version'],'SwayNC':['swaync','--version'],'Rofi':['rofi','-v']}.items():
+    for name,cmd in {'Hyprland':['hyprctl','version'],'Matugen':['matugen','--version'],'Waybar':['waybar','--version'],'Quickshell':['quickshell','--version'],'Rofi':['rofi','-v']}.items():
         try: versions[name]=run(cmd,5).splitlines()[0]
         except (RuntimeError,OSError,subprocess.SubprocessError):versions[name]='Unavailable'
     state=status()
@@ -145,7 +144,7 @@ def action(name,value):
     if name.startswith('appearance-'):
         op=name.removeprefix('appearance-')
         if op=='mode':
-            if value not in ('light','dark'):raise ValueError('appearance mode must be light or dark')
+            if value not in ('light','kona','dark'):raise ValueError('appearance mode must be light, kona or dark')
             result=run([BIN/'kona-appearance',value]);run([BIN/'kona-menu-sound'])
             return json.loads(result)
         if op not in ('preview','commit','revert','reset'):raise ValueError('unknown appearance action')
@@ -219,7 +218,7 @@ def action(name,value):
         return 'Preset applied'
     if name=='open':
         commands={'overview':[BIN/'kona-overview'],'capture':[BIN/'kona-screenshot','region-edit'],
-                  'audio':[BIN/'kona-audio-menu'],'notifications':[BIN/'kona-dashboard','--toggle'],
+                  'audio':[BIN/'kona-audio-menu'],'notifications':[BIN/'kona-end4-notifications','toggle'],
                   'wallpaper-fallback':[BIN/'kona-wallpaper-menu'],'launcher':['rofi','-show','drun','-theme',str(HOME/'.config/rofi/konata.rasi')],
                   'updates':[BIN/'kona-updates'],'recovery':['kitty','--hold','hyprctl','configerrors']}
         if value not in commands:raise ValueError('unknown action')

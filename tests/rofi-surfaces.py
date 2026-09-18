@@ -222,7 +222,7 @@ fi
         base = json.loads((ROOT/'.config/kona/theme/default/appearance.json').read_text())
         rendered = model['render'](base)
         self.assertIn('danger: '+base['danger']+';', rendered['rofi.rasi'])
-        for name in ['tokens.json','appearance.json','waybar.css','swaync.css','hyprland.colors']:
+        for name in ['tokens.json','appearance.json','waybar.css','swayosd.css','foot.ini','hyprland.colors']:
             self.assertEqual(rendered[name], (ROOT/'.config/kona/theme/default'/name).read_text())
 
 

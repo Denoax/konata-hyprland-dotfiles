@@ -30,7 +30,7 @@ class ArchWorkspace(unittest.TestCase):
         self.assertEqual(len(set(WORKSPACE.ARCH_CLASSES.values())), 3)
         self.assertNotIn("identity", WORKSPACE.ARCH_CLASSES)
         hyprland = (ROOT / ".config/hypr/hyprland.lua").read_text()
-        self.assertIn('bindSuper("SHIFT + D", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace toggle"))', hyprland)
+        self.assertIn('bindSuper("SHIFT + D", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace toggle"), { description = "Kona: Arch workspace" })', hyprland)
         self.assertIn('workspace = "special:arch silent"', hyprland)
         self.assertIn('workspace = "special:arch", layout = "master"', hyprland)
         self.assertIn('kona-arch-workspace scratch', hyprland)
@@ -81,7 +81,9 @@ class ArchWorkspace(unittest.TestCase):
         })
         self.assertIn("fish_color_autosuggestion AABBCC --dim", rendered)
         self.assertIn("set -g fish_history kona_scratch", rendered)
-        self.assertIn("╰─❯", rendered)
+        self.assertIn("starship init fish", rendered)
+        self.assertIn("zoxide init fish --cmd cd", rendered)
+        self.assertIn("alias ls='eza --icons --group-directories-first -1'", rendered)
         terminal = SCRATCH.render_config({
             "accent": "112233", "text": "445566", "secondary": "778899",
             "muted": "AABBCC", "success": "22CC88", "danger": "FF5566",
@@ -90,8 +92,21 @@ class ArchWorkspace(unittest.TestCase):
         hyprland = (ROOT / ".config/hypr/hyprland.lua").read_text()
         self.assertIn('match = { class = "^KonaScratch$" }', hyprland)
         self.assertIn('match = { class = "^KonaTerminal$" }', hyprland)
-        self.assertIn('hl.bind("ALT + RETURN", hl.dsp.exec_cmd(terminal))', hyprland)
-        self.assertIn("float = true", hyprland)
+        self.assertIn('hl.bind("ALT + RETURN", hl.dsp.exec_cmd(terminal), { description = "App: Terminal" })', hyprland)
+        terminal_rule = hyprland.split('name = "kona-terminal"', 1)[1].split('})', 1)[0]
+        self.assertIn('tile = true', terminal_rule)
+        self.assertNotIn('float = true', terminal_rule)
+
+    def test_foot_loads_kona_palette_from_the_main_section(self):
+        source = (ROOT / '.config/foot/foot.ini').read_text()
+        self.assertIn('pad=18x10', source)
+        include = source.index('include=~/.config/kona/theme/current/foot.ini')
+        self.assertLess(include, source.index('[scrollback]'))
+        model = load_script('kona-theme')
+        for mode in ('light', 'kona', 'dark'):
+            appearance = json.loads((ROOT / f'.config/kona/appearance/{mode}.json').read_text())
+            toolkit_mode = 'dark' if mode in ('kona', 'dark') else 'light'
+            self.assertTrue(model.render(appearance)['foot.ini'].startswith(f'[colors-{toolkit_mode}]'))
 
     def test_process_group_survives_launcher_exit_and_remains_attributable(self):
         process = __import__("subprocess").Popen(
@@ -113,7 +128,7 @@ class ArchWorkspace(unittest.TestCase):
         self.assertNotIn("arch-workspace", units)
         self.assertNotIn("daemon", (ROOT / ".local/bin/kona-arch-workspace").read_text().lower())
         packages = set((ROOT / "packages/pacman.txt").read_text().splitlines())
-        self.assertTrue({"btop", "fastfetch", "cava", "kitty", "fish"} <= packages)
+        self.assertTrue({"btop", "fastfetch", "cava", "kitty", "foot", "fish", "starship", "eza", "zoxide", "direnv"} <= packages)
 
 
 if __name__ == "__main__":

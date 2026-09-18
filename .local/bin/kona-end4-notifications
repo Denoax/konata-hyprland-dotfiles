@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Persistent end-4 notification owner and right-sidebar entrypoint."""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+PINNED_REVISION = "2f0c8bf42b803f4d597572f2a014d4e78d7d9f26"
+
+
+def source_root() -> Path:
+    return Path(os.environ.get("KONA_END4_SOURCE", Path.home() / ".local/share/kona/upstream/end4/ii"))
+
+
+def overlay_root() -> Path:
+    return Path(os.environ.get("KONA_END4_OVERLAY", Path.home() / ".config/quickshell/kona-end4"))
+
+
+def runtime_root() -> Path:
+    return Path.home() / ".cache/kona/end4-notifications"
+
+
+def xdg_root() -> Path:
+    return Path.home() / ".local/state/kona/end4-xdg"
+
+
+def environment() -> dict[str, str]:
+    root = xdg_root()
+    env = os.environ.copy()
+    env.update({
+        "XDG_CONFIG_HOME": str(root / "config"),
+        "XDG_STATE_HOME": str(root / "state"),
+        "XDG_CACHE_HOME": str(root / "cache"),
+        "KONA_END4_STATE_HOME": str(root / "state"),
+    })
+    for name in ("config", "state", "cache"):
+        (root / name).mkdir(parents=True, exist_ok=True)
+    return env
+
+
+def merge_missing(target: dict, defaults: dict) -> None:
+    for key, value in defaults.items():
+        if key not in target:
+            target[key] = value
+        elif isinstance(value, dict) and isinstance(target[key], dict):
+            merge_missing(target[key], value)
+
+
+def write_config(env: dict[str, str]) -> None:
+    destination = Path(env["XDG_CONFIG_HOME"]) / "illogical-impulse/config.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        value = json.loads(destination.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        value = {}
+    defaults = {
+        "appearance": {
+            "fonts": {
+                "main": "Google Sans Flex", "numbers": "Google Sans Flex",
+                "title": "Google Sans Flex", "reading": "Google Sans Flex",
+                "expressive": "Google Sans Flex", "iconNerd": "CaskaydiaCove Nerd Font",
+                "monospace": "CaskaydiaCove Nerd Font",
+            },
+            "transparency": {"enable": False, "automatic": False},
+        },
+        "notifications": {"timeout": 7000, "forceMonitor": {"enable": False, "name": ""}},
+        "sidebar": {"keepRightSidebarLoaded": False},
+    }
+    merge_missing(value, defaults)
+    # The persistent notification owner stays resident; the much larger right
+    # sidebar is constructed only while visible and released again on close.
+    value.setdefault("sidebar", {})["keepRightSidebarLoaded"] = False
+    destination.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def fingerprint() -> str:
+    digest = hashlib.sha256(PINNED_REVISION.encode())
+    for path in (
+        overlay_root() / "notifications-shell.qml",
+        overlay_root() / "KonaSidebarRight.qml",
+        overlay_root() / "GlobalStates.qml",
+        source_root() / "services/Notifications.qml",
+        source_root() / "modules/ii/notificationPopup/NotificationPopup.qml",
+        source_root() / "modules/ii/sidebarRight/SidebarRightContent.qml",
+    ):
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def integrate_owner_actions(runtime: Path) -> None:
+    path = runtime / "modules/ii/sidebarRight/SidebarRightContent.qml"
+    source = path.read_text(encoding="utf-8")
+    old_settings = '''GlobalStates.sidebarRightOpen = false;
+                    Quickshell.execDetached(["qs", "-p", root.settingsQmlPath]);'''
+    new_settings = '''GlobalStates.sidebarRightOpen = false;
+                    Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/kona-caelestia-settings"]);'''
+    old_session = '''GlobalStates.sessionOpen = true;'''
+    new_session = '''GlobalStates.sidebarRightOpen = false;
+                    Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/kona-caelestia-session"]);'''
+    if old_settings not in source or old_session not in source:
+        raise RuntimeError("pinned end-4 notification action contract changed")
+    path.write_text(source.replace(old_settings, new_settings, 1).replace(old_session, new_session, 1), encoding="utf-8")
+
+    popup = runtime / "modules/ii/notificationPopup/NotificationPopup.qml"
+    popup_source = popup.read_text(encoding="utf-8")
+    old_monitor = "Config.options.notifications.forceMonitor.enable ? s.name === Config.options.notifications.forceMonitor.name : s.name === Hyprland.focusedMonitor?.name"
+    new_monitor = "Config.options?.notifications?.forceMonitor?.enable ? s.name === Config.options.notifications.forceMonitor.name : s.name === Hyprland.focusedMonitor?.name"
+    if old_monitor not in popup_source:
+        raise RuntimeError("pinned end-4 notification monitor contract changed")
+    popup.write_text(popup_source.replace(old_monitor, new_monitor, 1), encoding="utf-8")
+
+
+def stage_runtime() -> Path:
+    source = source_root()
+    overlay = overlay_root()
+    if not source.is_dir():
+        raise RuntimeError("end-4 source is missing; run kona-install-upstream-ui")
+    runtime = runtime_root()
+    marker = runtime / ".kona-source"
+    wanted = fingerprint()
+    current = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+    if current == wanted:
+        return runtime
+    if runtime.exists():
+        shutil.rmtree(runtime)
+    shutil.copytree(source, runtime)
+    shutil.copy2(overlay / "notifications-shell.qml", runtime / "shell.qml")
+    shutil.copy2(overlay / "KonaSidebarRight.qml", runtime / "KonaSidebarRight.qml")
+    shutil.copy2(overlay / "GlobalStates.qml", runtime / "GlobalStates.qml")
+    integrate_owner_actions(runtime)
+    marker.write_text(wanted + "\n", encoding="utf-8")
+    return runtime
+
+
+def executable() -> str:
+    value = shutil.which("quickshell")
+    if not value:
+        raise RuntimeError("system quickshell is missing")
+    return value
+
+
+def ipc(method: str, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [executable(), "ipc", "-p", str(runtime_root()), "call", "konaNotifications", method, *arguments],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+
+def run_owner() -> int:
+    lock_path = runtime_root().with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = lock_path.open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return 0
+    env = environment()
+    runtime = stage_runtime()
+    write_config(env)
+    subprocess.run([str(Path(__file__).with_name("kona-upstream-theme"))], env=env, check=True)
+    os.execve(executable(), [executable(), "-n", "-p", str(runtime), "--no-color"], env)
+    return 0
+
+
+def ensure_owner(env: dict[str, str]) -> None:
+    if ipc("status", env=env).returncode == 0:
+        return
+    subprocess.Popen(
+        [str(Path(__file__).resolve()), "run"], env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=(Path.home() / ".local/state/kona/end4-notifications.log").open("ab"),
+        start_new_session=True,
+    )
+    for _ in range(100):
+        if ipc("status", env=env).returncode == 0:
+            return
+        time.sleep(0.05)
+    raise RuntimeError("end-4 notification owner did not become ready")
+
+
+def reload_owner(env: dict[str, str]) -> int:
+    current = ipc("status", env=env)
+    if current.returncode != 0:
+        return 0
+    state = json.loads(current.stdout)
+    if ipc("shutdown", env=env).returncode != 0:
+        raise RuntimeError("end-4 notification owner did not accept shutdown")
+    for _ in range(100):
+        if ipc("status", env=env).returncode != 0:
+            break
+        time.sleep(0.05)
+    else:
+        raise RuntimeError("end-4 notification owner did not stop for theme reload")
+    ensure_owner(env)
+    if state.get("silent") and ipc("dnd", "true", env=env).returncode != 0:
+        raise RuntimeError("end-4 notification DND state was not restored")
+    if state.get("open") and ipc("open", env=env).returncode != 0:
+        raise RuntimeError("end-4 notification panel state was not restored")
+    return 0
+
+
+def main() -> int:
+    try:
+        action = sys.argv[1] if len(sys.argv) > 1 else "toggle"
+        if action == "run" and len(sys.argv) == 2:
+            return run_owner()
+        if action not in ("toggle", "open", "close", "status", "waybar", "dnd-toggle", "dnd-on", "dnd-off", "reload", "shutdown") or len(sys.argv) > 2:
+            raise RuntimeError("usage: kona-end4-notifications [run|toggle|open|close|status|waybar|dnd-toggle|dnd-on|dnd-off|reload|shutdown]")
+        env = environment()
+        if action == "reload":
+            if not shutil.which("quickshell"):
+                return 0
+            return reload_owner(env)
+        if action in ("toggle", "open"):
+            ensure_owner(env)
+        method = "status" if action == "waybar" else "toggleDnd" if action == "dnd-toggle" else "dnd" if action.startswith("dnd-") else action
+        arguments = ("true" if action == "dnd-on" else "false",) if action in ("dnd-on", "dnd-off") else ()
+        result = ipc(method, *arguments, env=env)
+        if action in ("status", "waybar") and result.returncode == 0:
+            if action == "waybar":
+                state = json.loads(result.stdout)
+                icon = "󰂛" if state["silent"] else "󰂚" if state["count"] else "󰂜"
+                print(json.dumps({"text": icon, "tooltip": f'{state["count"]} notifications',
+                                  "class": "dnd" if state["silent"] else "active" if state["count"] else "empty"}))
+                return 0
+            print(result.stdout.strip())
+        return result.returncode
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f"kona-end4-notifications: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

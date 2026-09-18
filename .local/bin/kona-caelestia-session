@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Open Caelestia's transient session UI with Kona-owned commands."""
+
+from __future__ import annotations
+
+import hashlib
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+SOURCE = Path("/etc/xdg/quickshell/caelestia")
+
+
+def overlay_root() -> Path:
+    configured = os.environ.get("KONA_CAELESTIA_OVERLAY")
+    return Path(configured) if configured else Path.home() / ".config/quickshell/kona-caelestia"
+
+
+def runtime_root() -> Path:
+    return Path.home() / ".cache/kona/caelestia-session"
+
+
+def fingerprint() -> str:
+    digest = hashlib.sha256()
+    overlay = overlay_root()
+    for path in (
+        SOURCE / "shell.qml",
+        SOURCE / "LICENSE",
+        overlay / "session-shell.qml",
+        overlay / "KonaSessionWindow.qml",
+    ):
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def stage_runtime() -> Path:
+    if not SOURCE.is_dir():
+        raise RuntimeError("caelestia-shell is not installed (expected /etc/xdg/quickshell/caelestia)")
+    overlay = overlay_root()
+    if not overlay.is_dir():
+        raise RuntimeError(f"Kona Caelestia overlay is missing: {overlay}")
+    runtime = runtime_root()
+    marker = runtime / ".kona-source"
+    wanted = fingerprint()
+    current = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+    if current != wanted:
+        if runtime.exists():
+            shutil.rmtree(runtime)
+        shutil.copytree(SOURCE, runtime)
+        shutil.copy2(overlay / "session-shell.qml", runtime / "shell.qml")
+        shutil.copy2(overlay / "KonaSessionWindow.qml", runtime / "KonaSessionWindow.qml")
+        marker.write_text(wanted + "\n", encoding="utf-8")
+    return runtime
+
+
+def isolated_config() -> Path:
+    root = Path.home() / ".cache/kona/caelestia-session-xdg/config"
+    config = root / "caelestia/shell.json"
+    config.parent.mkdir(parents=True, exist_ok=True)
+    owner = str(Path.home() / ".local/bin/kona-session-action")
+    value = {
+        "session": {
+            "commands": {
+                "logout": [owner, "logout"],
+                "shutdown": [owner, "poweroff"],
+                "hibernate": [owner, "hibernate"],
+                "reboot": [owner, "reboot"],
+            }
+        }
+    }
+    config.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    return root
+
+
+def ipc(executable: str, runtime: Path, environment: dict[str, str], method: str) -> bool:
+    result = subprocess.run(
+        [executable, "ipc", "-p", str(runtime), "call", "konaSession", method],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def main() -> int:
+    try:
+        action = sys.argv[1] if len(sys.argv) > 1 else "toggle"
+        if action not in ("toggle", "close") or len(sys.argv) > 2:
+            raise RuntimeError("usage: kona-caelestia-session [toggle|close]")
+        lock_path = runtime_root().with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            runtime = stage_runtime()
+            executable = shutil.which("quickshell")
+            if not executable:
+                raise RuntimeError("system quickshell is missing; install caelestia-shell")
+            environment = os.environ.copy()
+            environment["XDG_CONFIG_HOME"] = str(isolated_config())
+            if ipc(executable, runtime, environment, action):
+                for _ in range(60):
+                    if not ipc(executable, runtime, environment, "status"):
+                        return 0
+                    time.sleep(0.05)
+                raise RuntimeError("Caelestia session surface did not close")
+            if action == "close":
+                return 0
+            helper = Path(os.environ.get("KONA_UPSTREAM_THEME", Path(__file__).with_name("kona-upstream-theme")))
+            subprocess.run([str(helper)], check=True)
+            child = subprocess.Popen(
+                [executable, "-n", "-p", str(runtime), "--no-color"],
+                env=environment,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=(Path.home() / ".local/state/kona/caelestia-session.log").open("ab"),
+            )
+            for _ in range(60):
+                if ipc(executable, runtime, environment, "status"):
+                    return 0
+                if child.poll() is not None:
+                    raise RuntimeError("Caelestia session surface exited before becoming ready")
+                time.sleep(0.05)
+            raise RuntimeError("Caelestia session surface did not become ready")
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"kona-caelestia-session: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

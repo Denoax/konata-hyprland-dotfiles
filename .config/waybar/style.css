@@ -25,10 +25,27 @@ window#waybar > box {
 #status {
   background: @panel;
   border: 1px solid alpha(@muted, .28);
-  border-radius: 8px;
+  border-radius: 0 0 12px 12px;
 }
 
-window#waybar.DP-4 #navigation { border-color: @line; }
+#navigation {
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0 0 14px 0;
+  padding-left: 4px;
+}
+
+#controls,
+#status {
+  border-top: 0;
+  border-right: 0;
+  border-radius: 0 0 0 14px;
+}
+
+window#waybar.DP-4 #navigation {
+  border-color: @line;
+  box-shadow: 3px 3px 14px @accent-12;
+}
 #time { border-color: @secondary-line; }
 
 tooltip {

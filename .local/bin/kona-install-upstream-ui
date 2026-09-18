@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+revision="2f0c8bf42b803f4d597572f2a014d4e78d7d9f26"
+shapes_revision="e31ec4cb4ebf6a46b267f5c42eabf6874916fa16"
+destination="${XDG_DATA_HOME:-$HOME/.local/share}/kona/upstream/end4"
+temporary="${destination}.new"
+
+command -v git >/dev/null || {
+  printf 'git is required to install the pinned end-4 UI source.\n' >&2
+  exit 1
+}
+
+if [[ -f "$destination/REVISION" ]] && [[ "$(cat "$destination/REVISION")" == "$revision" ]] \
+  && [[ -f "$destination/ii/modules/common/widgets/shapes/material-shapes.js" ]] \
+  && [[ -f "$destination/ROUNDED_POLYGON_LICENSE" ]] \
+  && [[ -f "$destination/ROUNDED_POLYGON_REVISION" ]]; then
+  printf 'end-4 UI source is already installed at %s\n' "$destination"
+  exit 0
+fi
+
+rm -rf -- "$temporary"
+mkdir -p -- "$temporary"
+git -c advice.detachedHead=false clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/end-4/dots-hyprland.git "$temporary/repository"
+git -C "$temporary/repository" sparse-checkout set dots/.config/quickshell/ii
+git -C "$temporary/repository" fetch --depth 1 origin "$revision"
+git -C "$temporary/repository" checkout --detach "$revision"
+mv "$temporary/repository/dots/.config/quickshell/ii" "$temporary/ii"
+git -C "$temporary/repository" show "$revision:LICENSE" > "$temporary/LICENSE"
+rm -rf -- "$temporary/repository"
+git -c advice.detachedHead=false clone --depth 1 \
+  https://github.com/end-4/rounded-polygon-qmljs.git "$temporary/ii/modules/common/widgets/shapes"
+git -C "$temporary/ii/modules/common/widgets/shapes" fetch --depth 1 origin "$shapes_revision"
+git -C "$temporary/ii/modules/common/widgets/shapes" checkout --detach "$shapes_revision"
+git -C "$temporary/ii/modules/common/widgets/shapes" show "$shapes_revision:LICENSE" \
+  > "$temporary/ROUNDED_POLYGON_LICENSE"
+rm -rf -- "$temporary/ii/modules/common/widgets/shapes/.git"
+printf '%s\n' "$revision" > "$temporary/REVISION"
+printf '%s\n' "$shapes_revision" > "$temporary/ROUNDED_POLYGON_REVISION"
+
+if [[ -e "$destination" ]]; then
+  backup="${destination}.previous"
+  rm -rf -- "$backup"
+  mv "$destination" "$backup"
+fi
+mv "$temporary" "$destination"
+printf 'Installed pinned end-4 UI source at %s\n' "$destination"

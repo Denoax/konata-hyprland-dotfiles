@@ -2,8 +2,7 @@
 -- Hyprland 0.56+ Lua configuration for a three-monitor Arch setup.
 
 local terminal = "~/.local/bin/kona-terminal"
-local launcher = "rofi -show drun -theme ~/.config/rofi/konata.rasi"
-local fileManager = "xdg-open ~"
+local fileManager = "~/.local/bin/kona-file-manager"
 local browser = "gtk-launch com.brave.Browser"
 local mainMod = "SUPER"
 local superTapArmed = false
@@ -329,30 +328,30 @@ hl.bind("SUPER + SUPER_L", function()
     end
 end, { release = true, transparent = true })
 
-bindSuper("RETURN", hl.dsp.exec_cmd(terminal))
-hl.bind("ALT + RETURN", hl.dsp.exec_cmd(terminal))
-bindSuper("SHIFT + RETURN", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
-bindSuper("SPACE", hl.dsp.exec_cmd(launcher))
-bindSuper("E", hl.dsp.exec_cmd(fileManager))
-bindSuper("B", hl.dsp.exec_cmd(browser))
-bindSuper("Q", hl.dsp.window.close())
-bindSuper("F", hl.dsp.window.fullscreen())
+bindSuper("RETURN", hl.dsp.exec_cmd(terminal), { description = "App: Terminal" })
+hl.bind("ALT + RETURN", hl.dsp.exec_cmd(terminal), { description = "App: Terminal" })
+bindSuper("SHIFT + RETURN", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-dashboard"), { description = "Kona: Dashboard" })
+bindSuper("SPACE", hl.dsp.exec_cmd("~/.local/bin/kona-end4-overview"), { description = "Kona: Search and workspace overview" })
+bindSuper("E", hl.dsp.exec_cmd(fileManager), { description = "App: File manager" })
+bindSuper("B", hl.dsp.exec_cmd(browser), { description = "App: Browser" })
+bindSuper("Q", hl.dsp.window.close(), { description = "Window: Close" })
+bindSuper("F", hl.dsp.window.fullscreen(), { description = "Window: Fullscreen" })
 bindSuper("SHIFT + SPACE", function()
     hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
     windowChanged(hl.get_active_window())
-end)
-bindSuper("P", hl.dsp.window.pseudo())
-bindSuper("J", hl.dsp.layout("togglesplit"))
+end, { description = "Window: Toggle floating" })
+bindSuper("P", hl.dsp.window.pseudo(), { description = "Window: Toggle pseudotile" })
+bindSuper("J", hl.dsp.layout("togglesplit"), { description = "Window: Toggle split direction" })
 
 -- Windows-style desktop controls.
-hl.bind("ALT + F4", hl.dsp.window.close())
-hl.bind("ALT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
-hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
-bindSuper("R", hl.dsp.exec_cmd("rofi -show run -theme ~/.config/rofi/run.rasi"))
-bindSuper("L", hl.dsp.exec_cmd("hyprlock"))
-bindSuper("D", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
-bindSuper("SHIFT + D", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace toggle"))
-bindSuper("M", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"))
+hl.bind("ALT + F4", hl.dsp.window.close(), { description = "Window: Close" })
+hl.bind("ALT + TAB", hl.dsp.exec_cmd("~/.local/bin/kona-end4-overview"), { description = "Kona: Workspace and window overview" })
+hl.bind("ALT + SHIFT + TAB", hl.dsp.exec_cmd("~/.local/bin/kona-end4-overview"), { description = "Kona: Workspace and window overview" })
+bindSuper("R", hl.dsp.exec_cmd("rofi -show run -theme ~/.config/rofi/run.rasi"), { description = "App: Run command" })
+bindSuper("L", hl.dsp.exec_cmd("hyprlock"), { description = "Session: Lock" })
+bindSuper("D", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"), { description = "Window: Show desktop" })
+bindSuper("SHIFT + D", hl.dsp.exec_cmd("~/.local/bin/kona-arch-workspace toggle"), { description = "Kona: Arch workspace" })
+bindSuper("M", hl.dsp.exec_cmd("~/.local/bin/kona-show-desktop"), { description = "Window: Show desktop" })
 local function minimizeActiveWindow()
     local window = hl.get_active_window()
     if window == nil then
@@ -362,7 +361,7 @@ local function minimizeActiveWindow()
     hl.dispatch(hl.dsp.window.tag({ tag = "minimized", window = window }))
     hl.dispatch(hl.dsp.window.move({ workspace = "special:minimized", follow = false, window = window }))
 end
-bindSuper("H", minimizeActiveWindow)
+bindSuper("H", minimizeActiveWindow, { description = "Window: Minimize" })
 hl.bind("CTRL + H", minimizeActiveWindow)
 bindSuper("SHIFT + H", function()
     local window = hl.get_window("tag:minimized")
@@ -373,23 +372,23 @@ bindSuper("SHIFT + H", function()
     hl.dispatch(hl.dsp.window.move({ workspace = workspace, window = window }))
     hl.dispatch(hl.dsp.window.clear_tags({ window = window }))
     hl.dispatch(hl.dsp.focus({ window = window }))
-end)
-bindSuper("TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"))
-bindSuper("I", hl.dsp.exec_cmd("systemsettings"))
-bindSuper("A", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard --toggle"))
-bindSuper("SHIFT + A", hl.dsp.exec_cmd("~/.local/bin/kona-audio-menu"))
-bindSuper("CTRL + A", hl.dsp.exec_cmd("~/.local/bin/kona-app-mixer"))
-bindSuper("W", hl.dsp.exec_cmd("~/.local/bin/kona-overview"))
-bindSuper("CTRL + P", hl.dsp.exec_cmd("~/.local/bin/kona-profile-menu"))
--- Keep the legacy Deck chord as a compatibility route to the single SwayNC owner.
-bindSuper("CTRL + SPACE", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
-bindSuper("CTRL + I", hl.dsp.exec_cmd("~/.local/bin/kona-shell studio"))
-bindSuper("F1", hl.dsp.exec_cmd("~/.local/bin/kona-shell shortcuts"))
-bindSuper("CTRL + M", hl.dsp.exec_cmd("~/.local/bin/kona-shell mosaic"))
-bindSuper("SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/kona-wallpaper-menu"))
-bindSuper("C", hl.dsp.exec_cmd("~/.local/bin/kona-quick-settings"))
-bindSuper("G", hl.dsp.exec_cmd("~/.local/bin/kona-game-mode toggle"))
-bindSuper("U", hl.dsp.exec_cmd("~/.local/bin/kona-updates"))
+end, { description = "Window: Restore minimized" })
+bindSuper("TAB", hl.dsp.exec_cmd("rofi -show window -theme ~/.config/rofi/window.rasi"), { description = "Window: Switch windows" })
+bindSuper("I", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-settings"), { description = "Kona: Settings" })
+bindSuper("A", hl.dsp.exec_cmd("~/.local/bin/kona-end4-surface assistant"), { description = "Kona: Intelligence, translator and anime" })
+bindSuper("SHIFT + A", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-audio"), { description = "Kona: Audio mixer and devices" })
+bindSuper("CTRL + A", hl.dsp.exec_cmd("~/.local/bin/kona-app-mixer"), { description = "Kona: Application audio mixer" })
+bindSuper("W", hl.dsp.exec_cmd("~/.local/bin/kona-end4-overview"), { description = "Kona: Search and workspace overview" })
+bindSuper("CTRL + P", hl.dsp.exec_cmd("~/.local/bin/kona-profile-menu"), { description = "Kona: Profile picker" })
+-- Compatibility chords now route to the selected upstream-backed Kona surfaces.
+bindSuper("CTRL + SPACE", hl.dsp.exec_cmd("~/.local/bin/kona-end4-notifications toggle"), { description = "Kona: Notifications" })
+bindSuper("CTRL + I", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-settings"), { description = "Kona: Settings" })
+bindSuper("F1", hl.dsp.exec_cmd("~/.local/bin/kona-end4-surface cheatsheet"), { description = "Kona: Keybinding cheat sheet" })
+bindSuper("CTRL + M", hl.dsp.exec_cmd("~/.local/bin/kona-shell mosaic"), { description = "Kona: Mosaic" })
+bindSuper("SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/kona-wallpaper-menu"), { description = "Kona: Wallpaper picker" })
+bindSuper("C", hl.dsp.exec_cmd("~/.local/bin/kona-quick-settings"), { description = "Kona: Quick settings" })
+bindSuper("G", hl.dsp.exec_cmd("~/.local/bin/kona-game-mode toggle"), { description = "Kona: Gaming mode" })
+bindSuper("U", hl.dsp.exec_cmd("~/.local/bin/kona-updates"), { description = "Kona: Updates and recovery" })
 bindSuper("UP", hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" }))
 bindSuper("DOWN", hl.dsp.window.fullscreen({ mode = "maximized", action = "unset" }))
 bindSuper("CTRL + LEFT", hl.dsp.focus({ workspace = "e-1" }))
@@ -397,20 +396,20 @@ bindSuper("CTRL + RIGHT", hl.dsp.focus({ workspace = "e+1" }))
 bindSuper("SHIFT + S", hl.dsp.exec_cmd("~/.local/bin/kona-screenshot region-edit"))
 bindSuper("SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/kona-record region"))
 bindSuper("CTRL + SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/kona-record output"))
-hl.bind("CTRL + SHIFT + ESCAPE", hl.dsp.exec_cmd("kitty --class KonaTaskManager btop"))
-hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_cmd("~/.local/bin/kona-session-menu"))
+hl.bind("CTRL + SHIFT + ESCAPE", hl.dsp.exec_cmd("kitty --class KonaTaskManager btop"), { description = "App: Task manager" })
+hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-session"), { description = "Session: Power menu" })
 bindSuper("X", hl.dsp.exec_cmd("~/.local/bin/kona-desktop-menu --force"))
 
 -- Desktop and Konata controls.
 hl.bind("CTRL + mouse:273", hl.dsp.exec_cmd("~/.local/bin/kona-desktop-menu"), { click = true })
-bindSuper("CTRL + D", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard"))
-bindSuper("N", hl.dsp.exec_cmd("~/.local/bin/kona-dashboard --toggle"))
+bindSuper("CTRL + D", hl.dsp.exec_cmd("~/.local/bin/kona-end4-notifications toggle"))
+bindSuper("N", hl.dsp.exec_cmd("~/.local/bin/kona-end4-notifications toggle"))
 bindSuper("SHIFT + N", hl.dsp.exec_cmd("~/.local/bin/kona-night-light toggle"))
 bindSuper("V", hl.dsp.exec_cmd("~/.local/bin/kona-clipboard"))
 bindSuper("CTRL + S", hl.dsp.exec_cmd("~/.local/bin/kona-session-save"))
 bindSuper("CTRL + SHIFT + S", hl.dsp.exec_cmd("~/.local/bin/kona-session-restore"))
 bindSuper("CTRL + L", hl.dsp.exec_cmd("hyprlock"))
-bindSuper("ESCAPE", hl.dsp.exec_cmd("~/.local/bin/kona-session-menu"))
+bindSuper("ESCAPE", hl.dsp.exec_cmd("~/.local/bin/kona-caelestia-session"), { description = "Session: Power menu" })
 
 -- Arrow-key window navigation remains available around the Windows shortcuts.
 for _, pair in ipairs({
@@ -522,12 +521,10 @@ hl.window_rule({
 hl.window_rule({
     name = "kona-terminal",
     match = { class = "^KonaTerminal$" },
-    float = true,
-    size = { 1240, 760 },
-    center = true,
+    tile = true,
     border_size = 1,
-    rounding = 12,
-    animation = "popin 96%",
+    rounding = 8,
+    animation = "popin 97%",
 })
 hl.window_rule({
     name = "scratch-terminal",

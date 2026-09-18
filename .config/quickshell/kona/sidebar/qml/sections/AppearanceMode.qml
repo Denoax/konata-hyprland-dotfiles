@@ -21,13 +21,19 @@ Item {
         }
         KButton {
             text: "Light"; selected: root.mode === "light"
-            width: 62; height: 32; hint: "Use Light appearance"
+            width: 50; height: 32; hint: "Use Light appearance"
             actionId: "appearance.light"
             onRequest: (id, args) => root.request(id, args)
         }
         KButton {
+            text: "Kona"; selected: root.mode === "kona"
+            width: 52; height: 32; hint: "Use pastel Kona blue appearance"
+            actionId: "appearance.kona"
+            onRequest: (id, args) => root.request(id, args)
+        }
+        KButton {
             text: "Dark"; selected: root.mode === "dark"
-            width: 62; height: 32; hint: "Use Dark appearance"
+            width: 50; height: 32; hint: "Use Dark appearance"
             actionId: "appearance.dark"
             onRequest: (id, args) => root.request(id, args)
         }

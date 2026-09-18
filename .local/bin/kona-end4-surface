@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+"""Launch selected end-4 UI surfaces under a transient isolated runtime."""
+
+from __future__ import annotations
+
+import hashlib
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
+
+
+PINNED_REVISION = "2f0c8bf42b803f4d597572f2a014d4e78d7d9f26"
+INTEGRATION_REVISION = "kona-overview-launch-v4"
+SURFACES = ("overview", "assistant", "cheatsheet")
+
+
+def source_root() -> Path:
+    configured = os.environ.get("KONA_END4_SOURCE")
+    return Path(configured) if configured else Path.home() / ".local/share/kona/upstream/end4/ii"
+
+
+def overlay_root() -> Path:
+    configured = os.environ.get("KONA_END4_OVERLAY")
+    return Path(configured) if configured else Path.home() / ".config/quickshell/kona-end4"
+
+
+def runtime_root(surface: str) -> Path:
+    return Path.home() / f".cache/kona/end4-{surface}"
+
+
+def xdg_root() -> Path:
+    return Path.home() / ".local/state/kona/end4-xdg"
+
+
+def fingerprint(surface: str) -> str:
+    digest = hashlib.sha256(f"{PINNED_REVISION}:{INTEGRATION_REVISION}:{surface}".encode())
+    for path in (overlay_root() / "shell.qml", overlay_root() / "GlobalStates.qml"):
+        digest.update(path.read_bytes())
+    digest.update((source_root() / "modules/common/widgets/shapes/material-shapes.js").read_bytes())
+    if surface == "cheatsheet":
+        digest.update((source_root() / "modules/ii/cheatsheet/Cheatsheet.qml").read_bytes())
+    return digest.hexdigest()
+
+
+def integrate_cheatsheet_lifecycle(runtime: Path) -> None:
+    """Keep end-4 visuals intact while making its close action end the host."""
+    path = runtime / "modules/ii/cheatsheet/Cheatsheet.qml"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace("id: cheatsheetLoader\n        active: false",
+                            "id: cheatsheetLoader\n        active: true", 1)
+    old = "function hide() {\n                cheatsheetLoader.active = false;\n            }"
+    new = "function hide() {\n                cheatsheetLoader.active = false;\n                Qt.callLater(Qt.quit);\n            }"
+    if old not in source:
+        raise RuntimeError("pinned end-4 cheatsheet lifecycle contract changed")
+    path.write_text(source.replace(old, new, 1), encoding="utf-8")
+
+
+def integrate_overview_app_launch(runtime: Path) -> None:
+    """Launch apps detached and keep the overview open after selection."""
+    item_path = runtime / "modules/ii/overview/SearchItem.qml"
+    item_source = item_path.read_text(encoding="utf-8")
+    item_old = """    onClicked: {
+        GlobalStates.overviewOpen = false
+        root.itemExecute()
+    }"""
+    item_new = """    onClicked: {
+        root.itemExecute()
+    }"""
+    if item_old not in item_source:
+        raise RuntimeError("pinned end-4 overview launch contract changed")
+    item_path.write_text(item_source.replace(item_old, item_new, 1), encoding="utf-8")
+
+    search_path = runtime / "services/LauncherSearch.qml"
+    search_source = search_path.read_text(encoding="utf-8")
+    search_old = """                    if (!entry.runInTerminal)
+                        entry.execute();"""
+    search_new = """                    if (!entry.runInTerminal)
+                        Quickshell.execDetached(["gtk-launch", String(entry.id).replace(/\\.desktop$/, "")]);"""
+    if search_old not in search_source:
+        raise RuntimeError("pinned end-4 desktop entry contract changed")
+    search_path.write_text(search_source.replace(search_old, search_new, 1), encoding="utf-8")
+
+    for relative in (
+        "modules/ii/overview/SearchItem.qml",
+        "modules/ii/overview/OverviewWindow.qml",
+    ):
+        icon_path = runtime / relative
+        icon_source = icon_path.read_text(encoding="utf-8")
+        icon_new = icon_source.replace('"image-missing"', '"applications-other-symbolic"')
+        if icon_new == icon_source:
+            raise RuntimeError(f"pinned end-4 fallback icon contract changed: {relative}")
+        icon_path.write_text(icon_new, encoding="utf-8")
+
+
+def stage_runtime(surface: str) -> Path:
+    source = source_root()
+    overlay = overlay_root()
+    if not source.is_dir():
+        raise RuntimeError("end-4 UI source is missing; run kona-install-upstream-ui")
+    if not overlay.is_dir():
+        raise RuntimeError(f"Kona end-4 overlay is missing: {overlay}")
+
+    runtime = runtime_root(surface)
+    marker = runtime / ".kona-source"
+    wanted = fingerprint(surface)
+    current = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+    if current != wanted:
+        if runtime.exists():
+            shutil.rmtree(runtime)
+        shutil.copytree(source, runtime)
+        for name in ("shell.qml", "GlobalStates.qml"):
+            shutil.copy2(overlay / name, runtime / name)
+        if surface == "overview":
+            integrate_overview_app_launch(runtime)
+        elif surface == "cheatsheet":
+            integrate_cheatsheet_lifecycle(runtime)
+        marker.write_text(wanted + "\n", encoding="utf-8")
+    return runtime
+
+
+def merge_missing(target: dict, defaults: dict) -> None:
+    for key, value in defaults.items():
+        if key not in target:
+            target[key] = value
+        elif isinstance(value, dict) and isinstance(target[key], dict):
+            merge_missing(target[key], value)
+
+
+def isolated_environment(surface: str) -> dict[str, str]:
+    root = xdg_root()
+    environment = os.environ.copy()
+    environment.update({
+        "XDG_CONFIG_HOME": str(root / "config"),
+        "XDG_STATE_HOME": str(root / "state"),
+        "XDG_CACHE_HOME": str(root / "cache"),
+        "KONA_END4_STATE_HOME": str(root / "state"),
+        "KONA_END4_SURFACE": surface,
+    })
+    local_trans = Path.home() / ".local/opt/kona-pkgs/translate-shell/usr/bin"
+    environment["PATH"] = f"{local_trans}:{environment.get('PATH', '')}"
+    for name in ("config", "state", "cache"):
+        (root / name).mkdir(parents=True, exist_ok=True)
+    return environment
+
+
+def write_config(environment: dict[str, str]) -> None:
+    destination = Path(environment["XDG_CONFIG_HOME"]) / "illogical-impulse/config.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        value = json.loads(destination.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        value = {}
+    defaults = {
+        "appearance": {
+            "fonts": {
+                "main": "Google Sans Flex",
+                "numbers": "Google Sans Flex",
+                "title": "Google Sans Flex",
+                "reading": "Google Sans Flex",
+                "expressive": "Google Sans Flex",
+                "iconNerd": "CaskaydiaCove Nerd Font",
+                "monospace": "CaskaydiaCove Nerd Font",
+            },
+            "transparency": {"enable": False, "automatic": False},
+        },
+        "overview": {"enable": True, "rows": 2, "columns": 2, "scale": 0.22},
+        "policies": {"ai": 1, "weeb": 1},
+        # Chat remains useful, while model-issued shell/config tools require a
+        # deliberate user opt-in instead of silently inheriting upstream policy.
+        "ai": {"tool": "none"},
+        "sidebar": {
+            "translator": {"enable": True, "delay": 350},
+            "booru": {"allowNsfw": False, "defaultProvider": "yandere", "limit": 20},
+        },
+    }
+    merge_missing(value, defaults)
+    destination.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def quickshell() -> str:
+    executable = shutil.which("quickshell")
+    if not executable:
+        raise RuntimeError("system quickshell is missing; install caelestia-shell")
+    return executable
+
+
+def close_surface(executable: str, surface: str, environment: dict[str, str]) -> bool:
+    result = subprocess.run(
+        [executable, "ipc", "-p", str(runtime_root(surface)), "call", "konaEnd4", "close"],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def is_ready(executable: str, surface: str, environment: dict[str, str]) -> bool:
+    result = subprocess.run(
+        [executable, "ipc", "-p", str(runtime_root(surface)), "call", "konaEnd4", "status"],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def main() -> int:
+    try:
+        surface = sys.argv[1] if len(sys.argv) > 1 else "overview"
+        if surface not in SURFACES or len(sys.argv) > 2:
+            raise RuntimeError("usage: kona-end4-surface [overview|assistant|cheatsheet]")
+        lock_path = Path.home() / ".cache/kona/end4-surfaces.lock"
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            executable = quickshell()
+            environment = isolated_environment(surface)
+            if close_surface(executable, surface, environment):
+                for _ in range(80):
+                    if not is_ready(executable, surface, environment):
+                        return 0
+                    time.sleep(0.05)
+                raise RuntimeError(f"end-4 {surface} surface did not close")
+            for other in SURFACES:
+                if other == surface or not close_surface(executable, other, environment):
+                    continue
+                for _ in range(40):
+                    if not is_ready(executable, other, environment):
+                        break
+                    time.sleep(0.025)
+                else:
+                    raise RuntimeError(f"end-4 {other} surface did not close")
+
+            runtime = stage_runtime(surface)
+            write_config(environment)
+            theme_helper = Path(os.environ.get("KONA_UPSTREAM_THEME", Path(__file__).with_name("kona-upstream-theme")))
+            subprocess.run([str(theme_helper)], env=environment, check=True)
+            if surface == "assistant":
+                sidebar = Path.home() / ".local/bin/kona-sidebar"
+                if sidebar.is_file():
+                    subprocess.run([str(sidebar), "hide"], stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, check=False)
+            log = Path.home() / f".local/state/kona/end4-{surface}.log"
+            log.parent.mkdir(parents=True, exist_ok=True)
+            child = subprocess.Popen(
+                [executable, "-n", "-p", str(runtime), "--no-color"],
+                env=environment,
+                start_new_session=True,
+                stdout=subprocess.DEVNULL,
+                stderr=log.open("ab"),
+            )
+            for _ in range(80):
+                if is_ready(executable, surface, environment):
+                    return 0
+                if child.poll() is not None:
+                    raise RuntimeError(f"end-4 {surface} surface exited before becoming ready")
+                time.sleep(0.05)
+            raise RuntimeError(f"end-4 {surface} surface did not become ready")
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError,
+            subprocess.CalledProcessError) as error:
+        print(f"kona-end4-surface: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

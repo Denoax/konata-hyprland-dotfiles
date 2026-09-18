@@ -26,8 +26,13 @@ QtObject {
     readonly property string uiFont: "Noto Sans"
     readonly property string dataFont: "JetBrains Mono"
     readonly property int pressMs: reducedMotion ? 0 : 90
-    readonly property int releaseMs: reducedMotion ? 0 : 140
-    readonly property int accordionMs: reducedMotion ? 0 : 200
-    readonly property int enterMs: reducedMotion ? 0 : 220
-    readonly property int exitMs: reducedMotion ? 0 : 180
+    readonly property int releaseMs: reducedMotion ? 0 : 180
+    // Match Caelestia's spatial motion grammar while keeping Kona's state owner.
+    readonly property int expressiveFastMs: reducedMotion ? 0 : 350
+    readonly property int expressiveDefaultMs: reducedMotion ? 0 : 500
+    readonly property var expressiveFastCurve: [0.42, 1.67, 0.21, 0.9, 1, 1]
+    readonly property var expressiveDefaultCurve: [0.38, 1.21, 0.22, 1, 1, 1]
+    readonly property int accordionMs: expressiveFastMs
+    readonly property int enterMs: expressiveDefaultMs
+    readonly property int exitMs: expressiveFastMs
 }

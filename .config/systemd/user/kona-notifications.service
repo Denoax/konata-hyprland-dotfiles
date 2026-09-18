@@ -1,0 +1,16 @@
+[Unit]
+Description=Kona end-4 notification owner
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+[Service]
+ExecStart=%h/.local/bin/kona-end4-notifications run
+ExecCondition=%h/.local/bin/kona-runtime-health ready
+Slice=session-graphical.slice
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=5

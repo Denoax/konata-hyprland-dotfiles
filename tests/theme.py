@@ -61,6 +61,30 @@ class ThemeTests(unittest.TestCase):
         self.assertEqual(self.active(), MODEL['render'](MODEL['appearance_tokens'](self.theme, 'dark')))
         self.assertEqual(self.call('--default').returncode, 0)
 
+    def test_kona_mode_is_accessible_and_uses_dark_toolkit_variant(self):
+        appearance = MODEL['appearance_tokens'](self.theme, 'kona')
+        rendered = MODEL['render'](appearance)
+        self.assertEqual(appearance['mode'], 'kona')
+        self.assertTrue(rendered['foot.ini'].startswith('[colors-dark]'))
+        for surface in ('background', 'surface', 'surface_alt', 'surface_elevated', 'surface_pressed'):
+            self.assertGreaterEqual(MODEL['contrast'](appearance['text'], appearance[surface]), 7)
+            self.assertGreaterEqual(MODEL['contrast'](appearance['text_secondary'], appearance[surface]), 4.5)
+
+    def test_kona_wallpaper_accent_uses_matugen_light_schema(self):
+        self.fake("assert sys.argv[sys.argv.index('--mode') + 1] == 'light'\n"
+                  "print(json.dumps({'colors': {'primary': {'light': {'color': '#4776c4'}}, "
+                  "'secondary': {'light': {'color': '#356bb7'}}}}))")
+        result = self.call('--image', str(self.image), '--mode', 'kona')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['mode'], 'kona')
+        self.assertEqual(json.loads(self.active()['appearance.json'])['mode'], 'kona')
+
+    def test_appearance_reload_refreshes_upstream_theme_and_notification_owner(self):
+        source = (ROOT / '.local/bin/kona-theme').read_text()
+        self.assertIn('kona-upstream-theme', source)
+        self.assertIn('kona-end4-notifications', source)
+        self.assertIn('run_reload([str(notifications), "reload"])', source)
+
     def test_image_changes_only_accent_family_and_identical_input_does_not_activate_again(self):
         old = json.loads(self.active()['tokens.json'])
         first = self.call('--image', str(self.image))
@@ -85,7 +109,7 @@ class ThemeTests(unittest.TestCase):
         result = self.call('--image', str(self.image))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('FileNotFoundError', result.stderr)
-        self.assertEqual(json.loads(self.active()['tokens.json'])['accent.primary'], '#7FAEFF')
+        self.assertEqual(json.loads(self.active()['tokens.json'])['accent.primary'], '#8EB8FF')
 
     def test_failed_empty_malformed_or_invalid_palette_preserves_known_good(self):
         self.call('--image', str(self.image))
@@ -102,7 +126,7 @@ class ThemeTests(unittest.TestCase):
         self.assertNotEqual(self.call('--image', str(self.home / 'missing')).returncode, 0)
         (self.theme / 'current/waybar.css').write_text('')
         self.assertNotEqual(self.call('--image', str(self.home / 'missing')).returncode, 0)
-        self.assertEqual(json.loads(self.active()['tokens.json'])['accent.primary'], '#7FAEFF')
+        self.assertEqual(json.loads(self.active()['tokens.json'])['accent.primary'], '#8EB8FF')
 
     def test_parallel_requests_expose_complete_sets(self):
         self.fake("time.sleep(.1)\nprint(json.dumps({'colors': {'primary': {'dark': {'color': '#fb91d6'}}, 'secondary': {'dark': {'color': '#cba8ed'}}}}))")
@@ -123,7 +147,7 @@ class ThemeTests(unittest.TestCase):
         socket = Path(self.env['XDG_RUNTIME_DIR']) / 'hypr/test/.socket.sock'
         socket.parent.mkdir(parents=True)
         socket.touch()
-        for name in ['pkill', 'swaync-client', 'hyprctl', 'systemctl']:
+        for name in ['pkill', 'hyprctl', 'systemctl']:
             p = self.bin / name
             p.write_text('#!/usr/bin/python3\nfrom pathlib import Path\nimport sys\n'
                          + f'with Path({str(log)!r}).open("a") as f:f.write(Path(sys.argv[0]).name+"\\n")\n')
@@ -136,14 +160,14 @@ class ThemeTests(unittest.TestCase):
                                   env=self.env, capture_output=True, text=True)
         result = apply()
         self.assertEqual(result.returncode, 0, result.stderr)
-        expected = ['hyprctl', 'swaync-client', 'systemctl', 'systemctl', 'pkill']
+        expected = ['hyprctl', 'systemctl', 'systemctl', 'pkill', 'pkill']
         self.assertEqual(log.read_text().splitlines(), expected)
         self.assertEqual(apply().returncode, 0)
         self.assertEqual(log.read_text().splitlines(), expected)
         pending = self.theme / 'reload-pending.json'
-        pending.write_text(json.dumps(['swaync.css']))
+        pending.write_text(json.dumps(['foot.ini']))
         self.assertEqual(apply().returncode, 0)
-        self.assertEqual(log.read_text().splitlines(), expected + ['hyprctl', 'swaync-client'])
+        self.assertEqual(log.read_text().splitlines(), expected + ['hyprctl', 'pkill'])
         self.assertFalse(pending.exists())
 
     def test_contrast_constraints_for_distinct_extreme_accents(self):
@@ -157,7 +181,7 @@ class ThemeTests(unittest.TestCase):
         socket = Path(self.env['XDG_RUNTIME_DIR']) / 'hypr/test/.socket.sock'
         socket.parent.mkdir(parents=True)
         socket.touch()
-        for name in ['swaync-client', 'hyprctl', 'systemctl']:
+        for name in ['hyprctl', 'systemctl']:
             p = self.bin / name
             p.write_text('#!/bin/sh\nexit 0\n')
             p.chmod(0o755)

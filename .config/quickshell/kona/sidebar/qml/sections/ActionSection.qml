@@ -22,6 +22,7 @@ KAccordion {
                 required property var modelData
                 width: parent.width; height: 34
                 text: modelData.label; iconName: modelData.icon || ""
+                plain: true
                 enabled: modelData.available !== false
                 hint: modelData.hint || modelData.label
                 actionId: modelData.actionId || ""

@@ -30,7 +30,7 @@ KAccordion {
                         spacing: 3
                         Item {
                             anchors.horizontalCenter: parent.horizontalCenter; width: 26; height: 24
-                            Image { anchors.centerIn: parent; width: 24; height: 24; source: modelData.icon; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true }
+                            AppIcon { anchors.centerIn: parent; iconSize: 24; source: modelData.icon }
                             Rectangle {
                                 visible: modelData.running === true
                                 anchors.right: parent.right; anchors.bottom: parent.bottom
@@ -69,7 +69,7 @@ KAccordion {
                     actionId: "application.activate"; payload: ({address: modelData.address})
                     contentItem: RowLayout {
                         spacing: 9
-                        Image { source: modelData.icon; Layout.preferredWidth: 20; Layout.preferredHeight: 20; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true }
+                        AppIcon { source: modelData.icon; iconSize: 20; Layout.preferredWidth: 20; Layout.preferredHeight: 20 }
                         Text { text: modelData.name; color: Tokens.text; font.family: Tokens.uiFont; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
                         Text { visible: modelData.windowCount > 1; text: String(modelData.windowCount); color: Tokens.muted; font.family: Tokens.dataFont; font.pixelSize: 10 }
                         Rectangle { Layout.preferredWidth: 7; Layout.preferredHeight: 7; radius: 3.5; color: modelData.active ? Tokens.accentStrong : Tokens.accent }

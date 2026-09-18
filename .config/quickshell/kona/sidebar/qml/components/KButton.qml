@@ -21,13 +21,19 @@ Button {
     Accessible.role: Accessible.Button
     opacity: enabled ? 1 : 0.4
     scale: down && !Tokens.reducedMotion ? 0.96 : 1.0
-    Behavior on scale { NumberAnimation { duration: root.down ? Tokens.pressMs : Tokens.releaseMs; easing.type: Easing.OutCubic } }
+    Behavior on scale {
+        NumberAnimation {
+            duration: root.down ? Tokens.pressMs : Tokens.releaseMs
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Tokens.expressiveFastCurve
+        }
+    }
     background: Rectangle {
         radius: root.round ? height / 2 : 9
         color: root.down ? Tokens.surfacePressed : root.selected ? Tokens.active : root.hovered ? Tokens.surface : root.plain ? "transparent" : Tokens.panel
-        border.width: root.activeFocus ? 2 : 1
-        border.color: root.activeFocus ? Tokens.accentStrong : root.selected ? Tokens.accent : root.plain && !root.hovered ? "transparent" : Tokens.line
-        Behavior on color { ColorAnimation { duration: Tokens.releaseMs } }
+        border.width: root.activeFocus ? 2 : root.selected ? 1 : 0
+        border.color: root.activeFocus ? Tokens.accentStrong : Tokens.accent
+        Behavior on color { ColorAnimation { duration: Tokens.releaseMs; easing.type: Easing.OutCubic } }
     }
     contentItem: RowLayout {
         spacing: root.iconName.length && root.text.length ? 9 : 0

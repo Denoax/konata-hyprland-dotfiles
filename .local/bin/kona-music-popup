@@ -21,7 +21,7 @@ def main():
         home / '.local/opt/kona-pkgs/quickshell-0.3.1/usr',
     )
     package = next((path for path in packages if (path / 'bin/quickshell').is_file()), packages[0])
-    executable = shutil.which('quickshell') or str(package / 'bin/quickshell')
+    executable = str(package / 'bin/quickshell') if (package / 'bin/quickshell').is_file() else shutil.which('quickshell')
     runtime = Path(os.environ.get('XDG_RUNTIME_DIR', f'/run/user/{os.getuid()}')) / 'kona'
     runtime.mkdir(exist_ok=True)
     with (runtime / 'music-popup.lock').open('w') as lock:

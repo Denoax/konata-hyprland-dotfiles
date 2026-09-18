@@ -38,7 +38,7 @@ if [[ "$config_only" == true ]]; then
   restore_flatpaks=false
 fi
 
-required_commands=(cp date find mkdir rsync)
+required_commands=(cp date find ln mkdir rm rsync)
 for command in "${required_commands[@]}"; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'Required command is missing: %s\n' "$command" >&2
@@ -46,7 +46,7 @@ for command in "${required_commands[@]}"; do
   }
 done
 
-config_roots=(btop cava fastfetch hypr kitty kona quickshell rofi swaync swayosd systemd waybar xdg-desktop-portal)
+config_roots=(btop cava fastfetch foot hypr kitty kona quickshell rofi swayosd systemd waybar xdg-desktop-portal)
 
 print_plan() {
   cat <<PLAN
@@ -79,10 +79,25 @@ backup_target() {
   cp -a -- "$source" "$destination"
 }
 
+# Presentation retired in favour of Caelestia's dashboard Weather tab. Keep the
+# cached Open-Meteo backend and user location; remove only the obsolete surface.
+obsolete_paths=(
+  '.config/quickshell/kona/weather'
+  '.local/bin/kona-weather-popup'
+  '.config/swaync'
+  '.config/systemd/user/swaync.service.d'
+  '.local/bin/kona-dashboard'
+)
+for relative in "${obsolete_paths[@]}"; do
+  backup_target "$relative"
+  rm -rf -- "$HOME/$relative"
+done
+
 for config in "${config_roots[@]}"; do
   [[ -d "$repo_root/.config/$config" ]] || continue
   backup_target ".config/$config"
 done
+backup_target '.config/starship.toml'
 
 while IFS= read -r -d '' source; do
   relative="${source#"$repo_root/"}"
@@ -94,6 +109,7 @@ for config in "${config_roots[@]}"; do
   mkdir -p "$HOME/.config/$config"
   rsync -a "$repo_root/.config/$config/" "$HOME/.config/$config/"
 done
+install -m 0644 "$repo_root/.config/starship.toml" "$HOME/.config/starship.toml"
 
 rsync -a "$repo_root/.local/bin/" "$HOME/.local/bin/"
 while IFS= read -r -d '' source; do
@@ -117,6 +133,11 @@ printf '%s\n' "$repo_root" > "${XDG_CONFIG_HOME:-$HOME/.config}/kona/backup-repo
 
 if [[ "$install_deps" == true ]]; then
   "$HOME/.local/bin/kona-install-deps"
+  "$HOME/.local/bin/kona-install-upstream-ui"
+  if [[ ! -d /etc/xdg/quickshell/caelestia ]]; then
+    printf '%s\n' \
+      'Caelestia dashboard support is unavailable until the caelestia-shell AUR package is installed.' >&2
+  fi
 fi
 
 if [[ "$restore_flatpaks" == true ]]; then
@@ -131,6 +152,11 @@ if [[ "$restore_flatpaks" == true ]]; then
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
+  # SwayNC ships a D-Bus-activatable user unit. Disabling it is insufficient:
+  # org.freedesktop.Notifications can start it again and race Kona's selected
+  # end-4 owner. Keep an explicit reversible mask in the restored user config.
+  mkdir -p "$HOME/.config/systemd/user"
+  ln -sfn /dev/null "$HOME/.config/systemd/user/swaync.service"
   systemctl --user daemon-reload
 fi
 

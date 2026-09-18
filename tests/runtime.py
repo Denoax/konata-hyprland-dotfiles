@@ -34,6 +34,7 @@ class Startup(unittest.TestCase):
             self.fake(self.bin / name)
         self.fake(self.home / '.local/opt/kona-pkgs/swayosd/usr/bin/swayosd-server')
         self.fake(self.home / '.local/bin/kona-runtime-health')
+        self.fake(self.home / '.local/bin/kona-end4-notifications')
         self.log = self.home / 'calls'
 
     def fake(self, path):
@@ -62,7 +63,7 @@ class Startup(unittest.TestCase):
         self.assertIn(['uwsm', 'app', '-s', 's', '-t', 'scope', '-u', 'kona-waybar', '--', 'waybar'], calls)
         services = next(c for c in calls if c[:3] == ['systemctl', '--user', 'start'])
         self.assertEqual(services[:3], ['systemctl', '--user', 'start'])
-        self.assertEqual(set(services[3:]), {'hypridle.service', 'swaync.service',
+        self.assertEqual(set(services[3:]), {'hypridle.service', 'kona-notifications.service',
                          'kona-clipboard@text.service',
                          'kona-clipboard@image.service', 'kona-automount.service', 'kona-osd.service'})
         imported = next(c for c in calls if c[:3] == ['systemctl', '--user', 'import-environment'])
@@ -77,6 +78,7 @@ class Startup(unittest.TestCase):
         self.assertIn('plain Hyprland', result.stderr)
         expected_residents = [
             ['hypridle'], ['waybar'],
+            ['kona-end4-notifications', 'run'],
             ['nm-applet', '--indicator'], ['blueman-applet'], ['udiskie', '--tray'],
             ['wl-paste', '--type', 'text', '--watch', 'cliphist', 'store'],
             ['wl-paste', '--type', 'image', '--watch', 'cliphist', 'store'],

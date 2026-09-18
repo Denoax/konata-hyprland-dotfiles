@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec "$HOME/.local/bin/kona-end4-surface" overview

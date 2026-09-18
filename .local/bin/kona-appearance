@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Single transactional owner for Kona geometry and system Light/Dark appearance."""
+"""Single transactional owner for Kona geometry and system appearance."""
 import fcntl
 import json
 import os
@@ -21,7 +21,8 @@ RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / 
 PREVIEW = RUNTIME / "appearance-preview.json"
 GTK_FILES = (CONFIG_HOME / "gtk-3.0/settings.ini", CONFIG_HOME / "gtk-4.0/settings.ini")
 KDE_GLOBALS = CONFIG_HOME / "kdeglobals"
-MODES = ("light", "dark")
+MODES = ("light", "kona", "dark")
+SYSTEM_MODES = {"light": "light", "kona": "dark", "dark": "dark"}
 PORTAL_VALUES = {"dark": 1, "light": 2}
 HOST_VALUES = {"dark": "prefer-dark", "light": "prefer-light"}
 QT_SCHEMES = {"dark": "BreezeDark", "light": "BreezeLight"}
@@ -161,21 +162,27 @@ def inferred_mode(host=None, portal=None):
     return "light" if portal == 2 else "dark"
 
 
+def system_mode(mode):
+    return SYSTEM_MODES[mode]
+
+
 def status():
     host = host_preference()
     portal = portal_preference()
     state = durable_state()
     mode = state["mode"] if state else inferred_mode(host, portal)
-    expected_dark = mode == "dark"
+    system = system_mode(mode)
+    expected_dark = system == "dark"
     gtk = {str(path): gtk_preference(path) for path in GTK_FILES}
     qt = qt_scheme()
     synchronized = (
-        host == HOST_VALUES[mode] and portal == PORTAL_VALUES[mode]
+        host == HOST_VALUES[system] and portal == PORTAL_VALUES[system]
         and all(value is expected_dark for value in gtk.values())
-        and qt == QT_SCHEMES[mode] and theme_mode() == mode
+        and qt == QT_SCHEMES[system] and theme_mode() == mode
     )
     return {
-        "schema": 1, "mode": mode, "source": state["source"] if state else "system",
+        "schema": 1, "mode": mode, "system_mode": system,
+        "source": state["source"] if state else "system",
         "host": host, "portal": portal, "gtk": gtk, "qt": qt,
         "theme": theme_mode(), "synchronized": synchronized,
     }
@@ -225,13 +232,14 @@ def restore_file(path, content):
 
 
 def set_host(mode):
-    run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", HOST_VALUES[mode]])
+    system = system_mode(mode)
+    run(["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", HOST_VALUES[system]])
     deadline = time.monotonic() + 3
     while True:
-        if host_preference() == HOST_VALUES[mode] and portal_preference() == PORTAL_VALUES[mode]:
+        if host_preference() == HOST_VALUES[system] and portal_preference() == PORTAL_VALUES[system]:
             return
         if time.monotonic() >= deadline:
-            raise RuntimeError(f"portal did not publish {mode} appearance")
+            raise RuntimeError(f"portal did not publish {system} preference for {mode} appearance")
         time.sleep(.1)
 
 
@@ -246,7 +254,8 @@ def notify_kde():
 
 def switch(mode, source="manual"):
     if mode not in MODES:
-        raise ValueError("appearance mode must be light or dark")
+        raise ValueError("appearance mode must be light, kona or dark")
+    system = system_mode(mode)
     before_state = capture_file(STATE)
     before_host = host_preference()
     before_gtk = {path: capture_file(path) for path in GTK_FILES}
@@ -260,17 +269,17 @@ def switch(mode, source="manual"):
     try:
         set_host(mode)
         for path in GTK_FILES:
-            update_ini_setting(path, "gtk-application-prefer-dark-theme", "true" if mode == "dark" else "false")
-        run(["plasma-apply-colorscheme", QT_SCHEMES[mode]], timeout=15)
+            update_ini_setting(path, "gtk-application-prefer-dark-theme", "true" if system == "dark" else "false")
+        run(["plasma-apply-colorscheme", QT_SCHEMES[system]], timeout=15)
         changed = _theme["activate"](THEME_ROOT, desired_files)
         failed = _theme["reload_consumers"](THEME_ROOT, changed)
         if failed:
             raise RuntimeError("consumer reload failed: " + ", ".join(failed))
-        if host_preference() != HOST_VALUES[mode] or portal_preference() != PORTAL_VALUES[mode]:
+        if host_preference() != HOST_VALUES[system] or portal_preference() != PORTAL_VALUES[system]:
             raise RuntimeError("system/portal appearance verification failed")
-        if any(gtk_preference(path) is not (mode == "dark") for path in GTK_FILES):
+        if any(gtk_preference(path) is not (system == "dark") for path in GTK_FILES):
             raise RuntimeError("GTK appearance verification failed")
-        if qt_scheme() != QT_SCHEMES[mode]:
+        if qt_scheme() != QT_SCHEMES[system]:
             raise RuntimeError("Qt appearance verification failed")
         if theme_mode() != mode:
             raise RuntimeError("Kona appearance verification failed")
@@ -345,7 +354,7 @@ def geometry_command(command, arguments):
 
 def main():
     if len(sys.argv) < 2:
-        raise ValueError("usage: kona-appearance light|dark|toggle|status|reconcile|preview|revert|commit|reset")
+        raise ValueError("usage: kona-appearance light|kona|dark|toggle|status|reconcile|preview|revert|commit|reset")
     command, arguments = sys.argv[1], sys.argv[2:]
     if command == "status":
         print(json.dumps(status(), sort_keys=True))

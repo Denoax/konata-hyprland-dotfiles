@@ -5,40 +5,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
 ROOT = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'kona'
-
-def sync_swaync_motion(mode, profile):
-    """Translate the shared motion preference to SwayNC's only motion switch."""
-    path = ROOT.parent / 'swaync/config.json'
-    if not path.is_file():
-        return
-    data = json.loads(path.read_text())
-    reduced = mode in ('reduced', 'off') or profile in ('focus', 'gaming')
-    desired = 0 if reduced else 200
-    changed = data.get('transition-time') != desired
-    data['transition-time'] = desired
-    tools = data.get('widget-config', {}).get('menubar#system', {}).get('menu#tools')
-    if isinstance(tools, dict):
-        animation = 'none' if reduced else 'slide_down'
-        changed = changed or tools.get('animation-type') != animation or tools.get('animation-duration') != 190
-        tools['animation-type'] = animation
-        tools['animation-duration'] = 190
-    if not changed:
-        return
-    fd, temporary = tempfile.mkstemp(prefix='.config.', suffix='.json', dir=path.parent)
-    try:
-        with os.fdopen(fd, 'w') as stream:
-            json.dump(data, stream, indent=2, ensure_ascii=False)
-            stream.write('\n')
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
-    subprocess.run(['swaync-client', '--reload-config', '--skip-wait'],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
 
 def expression(tokens, mode='full', profile='daily', intensity=1):
     if mode not in ('full', 'reduced', 'off') or not .75 <= intensity <= 1.25:
@@ -74,7 +42,6 @@ def main():
     p = subprocess.run(['hyprctl','eval',code],capture_output=True,text=True,timeout=5)
     if p.returncode or 'error' in p.stdout.lower():
         raise RuntimeError(p.stderr or p.stdout)
-    sync_swaync_motion(mode, profile)
 
 if __name__=='__main__':
     try: main()

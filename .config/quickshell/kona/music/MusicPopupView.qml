@@ -61,7 +61,10 @@ Item {
     }
 
     function asset(path) { return Qt.resolvedUrl("assets/reconstruction-v3/" + path); }
-    function icon(name) { return Qt.resolvedUrl("assets/" + Appearance.mode + "/" + name + ".svg"); }
+    function icon(name) {
+        const assetMode = Appearance.mode === "dark" ? "dark" : "light";
+        return Qt.resolvedUrl("assets/" + assetMode + "/" + name + ".svg");
+    }
 
     RectangularShadow {
         x: 20; y: 20; width: 1220; height: 212
