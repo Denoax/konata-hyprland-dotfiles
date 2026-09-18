@@ -1,9 +1,10 @@
 # V3 showcase
 
-`assets/v3/` contains real rendered captures of Kona Desktop V3 taken on 2026-09-17. They are documentation media, never functional UI assets.
+`assets/v3/` contains the public V3 banner and real rendered captures of Kona Desktop V3 taken on 2026-09-17. They are documentation media, never functional UI assets.
 
 | Asset | What it proves |
 | --- | --- |
+| `kona-v3-banner.webp` | Public Arch/Kona identity artwork for the repository header |
 | `hero-triple.webp` | Real three-output Wallpaper Engine composition |
 | `sidebar-rail-{dark,light}.webp` | Shared sidebar geometry under both semantic appearances |
 | `sidebar-motion.gif` | Native Quickshell reveal/collapse motion |

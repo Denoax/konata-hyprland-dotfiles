@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="showcase/assets/v3/kona-v3-banner.webp" alt="Kona Desktop V3 — Arch Linux and Hyprland" width="100%">
+
 # KONA DESKTOP V3
 
 **A fast, characterful Arch Linux + Hyprland workstation.**<br>
